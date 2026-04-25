@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chamber-simulator
+  namespace: cvd-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chamber-simulator
+  template:
+    metadata:
+      labels:
+        app: chamber-simulator
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+      - name: simulator
+        image: hsunacr.azurecr.io/chamber-simulator:latest
+        ports:
+        - containerPort: 5555
+        env:
+        - name: SIM_PORT
+          value: "5555"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chamber-simulator
+  namespace: cvd-system
+spec:
+  selector:
+    app: chamber-simulator
+  ports:
+  - port: 5555

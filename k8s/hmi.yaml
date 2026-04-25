@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hmi-frontend
+  namespace: cvd-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hmi-frontend
+  template:
+    metadata:
+      labels:
+        app: hmi-frontend
+    spec:
+      containers:
+      - name: hmi
+        image: hsunacr.azurecr.io/hmi-frontend:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "250m"
+            memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hmi-frontend
+  namespace: cvd-system
+spec:
+  type: LoadBalancer
+  selector:
+    app: hmi-frontend
+  ports:
+  - port: 80
+    targetPort: 80

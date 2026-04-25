@@ -1,0 +1,12 @@
+FROM ubuntu:22.04 AS build
+RUN apt-get update && apt-get install -y build-essential cmake && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY src/common/ common/
+COPY src/controller/ controller/
+WORKDIR /src/controller
+RUN cmake -B build && cmake --build build
+
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 && rm -rf /var/lib/apt/lists/*
+COPY --from=build /src/controller/build/cvd_controller /usr/local/bin/
+CMD ["cvd_controller"]

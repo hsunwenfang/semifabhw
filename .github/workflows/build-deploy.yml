@@ -3,6 +3,7 @@ name: Build & Deploy CVD Sim
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 env:
   ACR_NAME: hsunacr

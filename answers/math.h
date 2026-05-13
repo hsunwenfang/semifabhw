@@ -1,0 +1,3 @@
+
+
+inline int math(int a, int b);

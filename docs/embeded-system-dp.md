@@ -184,7 +184,7 @@ bool is_schedulable(RmsTask* tasks, int n) {
 
 ### 10. Flat State Machine
 
-A `switch` statement over an enum of states, executed each cycle. Each case reads inputs, computes outputs, and checks transition conditions. Transitions change the state variable and optionally log the change. Simple, readable, debuggable — the default choice for embedded control. Limitations appear when states exceed ~10 or when substates emerge. Add entry/exit actions by comparing previous state to current state after the switch. Your CVD controller's IDLE→PUMP_DOWN→GAS_STABILIZE→PROCESS→PURGE→VENT chain is a textbook flat FSM.
+A `switch` statement over an enum of states, executed each cycle.
 
 ```cpp
 enum class State { IDLE, PUMP_DOWN, PROCESS, FAULT };
@@ -213,7 +213,7 @@ void fsm_step(const SensorData& s) {
 
 ### 11. State Table
 
-Replace switch/case with a data table: rows are `{current_state, event, guard, next_state, action}`. The engine iterates the table looking for a matching `(state, event)` row, checks the guard condition, executes the action, and transitions. Adding new states or transitions requires only a new table row — no code changes. The table can be auto-generated from UML statechart tools. Table-driven FSMs are easier to review in safety audits because the entire behavior is visible in one declaration.
+`{current_state, event, guard, next_state, action}`.
 
 ```cpp
 struct Transition {
@@ -243,7 +243,14 @@ void dispatch(Event e) {
 
 ### 12. Hierarchical State Machine (HSM)
 
-States can contain substates. A parent state defines default behavior; child states override specific events. Unhandled events propagate up to the parent — like virtual method dispatch in OOP. Example: a `RUNNING` parent state handles `EMERGENCY_STOP` for all children (`RAMP_UP`, `HOLD`, `RAMP_DOWN`). Reduces duplication when multiple states share transitions. Implement with a `parent` pointer per state or using Miro Samek's QP framework pattern. Entry/exit actions fire when transitioning across hierarchy levels.
+States can contain substates.
+A parent state defines default behavior;
+child states override specific events.
+Unhandled events propagate up to the parent — like virtual method dispatch in OOP.
+Example: a `RUNNING` parent state handles `EMERGENCY_STOP` for all children (`RAMP_UP`, `HOLD`, `RAMP_DOWN`).
+Reduces duplication when multiple states share transitions.
+Implement with a `parent` pointer per state or using Miro Samek's QP framework pattern.
+Entry/exit actions fire when transitioning across hierarchy levels.
 
 ```cpp
 struct HsmState {
@@ -273,7 +280,12 @@ HsmState* hsm_dispatch(HsmState* current, Event e) {
 
 ### 13. State Pattern (OOP)
 
-Each state is a class implementing a common `IState` interface with `enter()`, `execute()`, `exit()` methods. The context object holds a pointer to the current state and delegates calls. Transitions replace the pointer. This separates per-state logic into dedicated classes, each testable in isolation. Downside: heap allocation or a static pool is needed for state objects, and the indirection can be too heavy for small MCUs. Best suited for larger embedded systems (Linux-based, Cortex-A) where RAM and code size are less constrained.
+Each state is a class implementing a common `IState` interface with `enter()`, `execute()`, `exit()` methods.
+The context object holds a pointer to the current state and delegates calls.
+Transitions replace the pointer.
+This separates per-state logic into dedicated classes, each testable in isolation.
+Downside: heap allocation or a static pool is needed for state objects, and the indirection can be too heavy for small MCUs.
+Best suited for larger embedded systems (Linux-based, Cortex-A) where RAM and code size are less constrained.
 
 ```cpp
 class IState {
@@ -302,7 +314,14 @@ public:
 
 ### 14. Observer / Publish-Subscribe
 
-A subject maintains a list of callback function pointers. When an event occurs, it iterates the list and invokes each callback with the event data. Subscribers register/unregister at runtime. Use a fixed-size array of function pointers (no `std::vector` on MCU). This decouples the sensor module from the display, logger, and network modules — the sensor doesn't know who listens. Keep callbacks short to avoid blocking the publisher. In C++, use `std::function` on capable targets or raw function pointers on bare-metal.
+A subject maintains a list of callback function pointers.
+When an event occurs, it iterates the list and invokes each callback with the event data.
+Subscribers register/unregister at runtime.
+
+Use a fixed-size array of function pointers (no `std::vector` on MCU).
+This decouples the sensor module from lister types.
+Keep callbacks short to avoid blocking the publisher.
+In C++, use `std::function` on capable targets or raw function pointers on bare-metal.
 
 ```cpp
 template<typename T, int MaxSubs = 8>
@@ -407,7 +426,14 @@ ParseState parse_byte(uint8_t byte) {
 
 ### 18. Double Buffer
 
-Maintain two buffers: one being written by the producer, one being read by the consumer. When the producer finishes a frame, swap the pointers atomically. The consumer always reads a complete, consistent frame — never a half-written one. Zero-copy, no mutex needed if the swap is atomic. Used for display framebuffers, sensor data frames, and network packet assembly. On MCUs, use a `volatile` pointer swap. On multi-core, use `std::atomic<T*>::exchange`. Costs 2× memory but eliminates all read/write contention.
+Maintain two buffers: one being written by the producer, one being read by the consumer.
+When the producer finishes a frame, swap the pointers atomically.
+The consumer always reads a complete, consistent frame — never a half-written one.
+Zero-copy, no mutex needed if the swap is atomic.
+Used for display framebuffers, sensor data frames, and network packet assembly.
+On MCUs, use a `volatile` pointer swap.
+On multi-core, use `std::atomic<T*>::exchange`.
+Costs 2× memory but eliminates all read/write contention.
 
 ```cpp
 template<typename T>
@@ -433,7 +459,12 @@ DoubleBuffer<SensorFrame> sensor_buf;
 
 ### 19. Ring Buffer / Circular Queue
 
-A fixed-size array with head and tail indices that wrap around. `push` writes at head and advances; `pop` reads at tail and advances. When head catches tail, the buffer is full. No dynamic allocation, O(1) operations, cache-friendly. The fundamental data structure in embedded systems — used for UART RX/TX buffers, audio streams, log histories, and inter-task communication. Power-of-two sizes allow modulo via bitmask (`& (N-1)`) instead of division. Single-producer single-consumer variants need no locks.
+A fixed-size array with head and tail indices that wrap around. 
+`push` writes at head and advances; `pop` reads at tail and advances.
+When head catches tail, the buffer is full.
+No dynamic allocation, O(1) operations, cache-friendly.
+The fundamental data structure in embedded systems — used for UART RX/TX buffers, audio streams, log histories, and inter-task communication.
+Power-of-two sizes allow modulo via bitmask (`& (N-1)`) instead of division. Single-producer single-consumer variants need no locks.
 
 ```cpp
 template<typename T, int N>
@@ -649,7 +680,8 @@ bool recv_packet(int sock, SimPacket& pkt) {
 
 ### 27. Static Allocation
 
-Allocate all memory at compile time — global arrays, stack variables, `static` locals. Zero use of `malloc`, `new`, or any dynamic allocator. This eliminates heap fragmentation, allocation failures, and memory leaks — the top three reliability killers in long-running embedded systems. Size every buffer for the worst case and `static_assert` that it fits in RAM. Your CVD controller uses this pattern — `SimPacket pkt{}` on the stack, fixed `gas_flow_recipe[8]` array. Most safety-critical standards (MISRA, DO-178C) require or strongly recommend static allocation only.
+Allocate all memory at compile time — global arrays, stack variables, `static` locals.
+Zero use of `malloc`, `new`, or any dynamic allocator. This eliminates heap fragmentation, allocation failures, and memory leaks — the top three reliability killers in long-running embedded systems. Size every buffer for the worst case and `static_assert` that it fits in RAM. Your CVD controller uses this pattern — `SimPacket pkt{}` on the stack, fixed `gas_flow_recipe[8]` array. Most safety-critical standards (MISRA, DO-178C) require or strongly recommend static allocation only.
 
 ```cpp
 // All memory determined at compile time

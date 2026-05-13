@@ -1,0 +1,1 @@
+g++ -std=c++17 -shared -fPIC 15_inline/a.cpp 15_inline/b.cpp -o 15_inline/ab.dylib

@@ -3,23 +3,22 @@
 
 # Types and Auto
 
-cast
+## Cast
 
-Cast	Safety	Runtime cost	Your project uses
-static_cast	Compiler-checked	Zero	CRTP, enum conversion
-dynamic_cast	Runtime-checked	vtable lookup	Not used (avoid in embedded)
-reinterpret_cast	Unchecked	Zero	Reg<Addr> — int → pointer
-const_cast	Unchecked	Zero	Not used
+- `static_cast` — Compiler-checked, zero cost → CRTP, enum conversion
+- `dynamic_cast` — Runtime-checked, vtable lookup → Not used (avoid in embedded)
+- `reinterpret_cast` — Unchecked, zero cost → `Reg<Addr>` int → pointer
+- `const_cast` — Unchecked, zero cost → can cast away const but not used
 
 ## rvalue and lvalue
 
 - lvalue has a persistent address in mem so can be pointed to
 - rvalue is only temporary exists during evaluation
-- & test : lvalue has address while rvalue doesnot
+- & test : & get the address outof lvalue while rvalue cannot
 - T& -> lvalue reference -> alias to variable
 - const T& -> const lvalue reference applicable for rvalue -> read-only alias
-- T&& -> rvalue referene -> take ownership of temporaries
-[TODO] This matters less in embedded (you avoid heap/vectors), but the lvalue/rvalue distinction is why std::move exists — it casts an lvalue to an rvalue reference, saying "I'm done with this, steal its guts."
+- T&& -> rvalue reference -> ori value points to nullptr 
+
 
 ## function pointer
 
@@ -33,22 +32,23 @@ void(*signal(int, void (*)(int)))(int);
 __END_DECLS
 #endif  /* !_SYS_SIGNAL_H_ */
 ```
-- void(*)(int) - pointer to a fn taking int returns void -> fnn
-- signal is inputted int & fnn and output fnn
+- void(*)(int) - pointer to a fn taking int returns void -> fn_ptr
+- signal is inputted int & fn_ptr and output fn_ptr
 
 # Polymorphism
 
-class Stm32Gpio : public IGpio {
-- public : IGpio& ref = stm32_obj; -> private doesnot allow this
+`class Stm32Gpio : public IGpio {`
+- public : `IGpio& ref = stm32_obj;` → private does not allow this
 
 ## class, struct and namespace
 
-### 
+### namespace vs struct
 
 - namespace can be extended anywhere so,
-- namespace cannot have `template` not like the locally closed struct
+- namespace cannot have `template` parameters, unlike the locally closed struct
 
 ```cpp
+// valued template !
 template<uint32_t Addr>
 struct Reg {
     static volatile uint32_t& ref() {
@@ -61,21 +61,15 @@ struct Reg {
 // Usage
 constexpr uint32_t GPIOA_ODR = 0x40020014;
 Reg<GPIOA_ODR>::set_bits(1 << 5);  // set pin 5 high
-
-Address        Byte
-0x40020014  →  byte 0 (bits 0-7)    ← pins 0-7
-0x40020015  →  byte 1 (bits 8-15)   ← pins 8-15
-0x40020016  →  byte 2 (bits 16-23)  ← pins 16-23
-0x40020017  →  byte 3 (bits 24-31)  ← pins 24-31
 ```
 
 ## virtual and override
 
-- virtual prefixed parent method should be overwrite by child method
+- virtual prefixed parent method should be overridden by child method
 - virtual uint64_t micros() = 0; -> `=0` means pure virtual where base cannot provide implementation
-- overwrite prefixed child method let compiler safety check
-    - w/o overwrite may cause wrong parameter
-- compliler stores virtual parent fns in vtable
+- override-suffixed child method lets compiler safety check
+    - w/o override may cause wrong parameter
+- compiler stores virtual parent fns in vtable
 - Cost : child fns points to the parent fns in vtable + indirect call when virtual function call
 
 ## dependency injection -> polymorphism at consumer
@@ -88,7 +82,7 @@ Stm32Gpio led(GPIOA_ODR, 5);
 ```cpp
 // when Stm32Gpio is the only child
 void blink(Stm32Gpio& led) {led.set(true); }
-// 1 rutime polymorphism
+// 1 runtime polymorphism
 // vtable lookup, works with any GPIO
 void blink(IGpio& led) {led.set(true); }
 ```
@@ -103,6 +97,8 @@ template<typename Gpio>
 void blink(Gpio& led) {led.set(true); }
 
 // 3 CRTP
+// no mixed typed arr
+// GpioBase<Stm32Gpio> and GpioBase<NrfGpio> are different essentially
 template<typename Derived>
 class GpioBase {
 public:
@@ -122,110 +118,369 @@ public:
 };
 ```
 
-## 
+# Stack, Heap, and Object Lifecycle
 
-# Memory Structure
+## Fundamentals
 
-Full address space with bus routing:
+reference's hidden pointer and a heap pointer live on the stack.
 
-0xFFFFFFFF ┌──────────────────────────┐
-           │ System / Debug peripherals │ → routed to debug hardware
-0xE0000000 ├──────────────────────────┤
-           │                          │
-           │     (reserved/unused)    │ → bus fault if accessed
-           │                          │
-0x60000000 ├──────────────────────────┤
-           │   External memory        │ → routed to external bus pins
-0x40020014 ├──────────────────────────┤
-           │   Peripheral registers   │ → routed to HARDWARE LOGIC
-           │   GPIO, UART, SPI, I2C   │   (transistors, flip-flops,
-           │   ADC, DAC, Timers       │    comparators, shift registers)
-           │                          │   NOT memory cells
-0x40000000 ├──────────────────────────┤
-           │                          │
-           │   SRAM                   │ → routed to MEMORY CELLS
-           │   ┌── Stack (top) ──┐    │   (actual 6-transistor SRAM cells
-           │   │  grows down ↓   │    │    that store 0 or 1)
-           │   ├─────────────────┤    │
-           │   │  ↑ grows up     │    │
-           │   │  Heap (bottom)  │    │
-           │   ├─────────────────┤    │
-           │   │  .bss (globals) │    │
-           │   │  .data (init'd) │    │
-           │   └─────────────────┘    │
-0x20000000 ├──────────────────────────┤
-           │   Flash (read-only)      │ → routed to flash memory cells
-           │   your compiled code     │   (floating-gate transistors)
-           │   const data             │
-0x00000000 └──────────────────────────┘
+### What is a stack frame?
 
-## Heap and Queue
+Every function call pushes a **frame** onto the stack containing:
+- Return address (where to go when function ends)
+- Arguments passed to the function
+- Local variables declared inside the function
 
-┌─────────────────────────┐  High address
-│         Stack            │  ← grows downward
-│  (automatic, per-function)│
-│  local variables, args   │
-│  freed when function returns│
-├─────────────────────────┤
-│           ↓              │
-│       (free space)       │
-│           ↑              │
-├─────────────────────────┤
-│         Heap             │  ← grows upward
-│  (manual, lives until    │
-│   you free it)           │
-├─────────────────────────┤
-│   Global/Static data     │
-├─────────────────────────┤
-│   Code (.text)           │
-└─────────────────────────┘  Low address
+When the function returns, the frame is **popped** — all locals are destroyed instantly.
 
-## Stack v.s. Heap
-- Allocate
-    - Compiler automatically
-    - You, via new / malloc
-- Freed by
-    - Automatically when function returns
-    - delete / free
-- Speed
-    - 1 instruction (sub sp, #size)
-    - Hundreds of instructions (find free block, update bookkeeping)
-- Size
-    - OS decide to have small stack and large heap
-- Fragmentation
-    - Never
-    - repeated alloc/free leaves gaps
+- **Stack** (~1 instruction each, ~100× faster)
+  - Allocate: `sub sp, #size`
+  - Free: `add sp, #size`
+- **Heap** (function call → allocator bookkeeping)
+  - Allocate: `bl _malloc` → free-list search, possible `mmap` syscall
+  - Free: `bl _free` → coalesce free-list, return block
 
-Scenario	Solution	Where
-Size known at compile time	double buf[256]	Stack
-Size known at runtime, small	alloca(n) (non-standard)	Stack — but risky
-Size known at runtime, safe	std::vector<double> v(n)	Heap internally
-Size bounded but varies	std::array<double, MAX_N>	Stack — allocate worst case
+```
+call chain: main() → foo() → bar()
 
-## SRAM vs GPIO ODR
+Stack (grows downward):
+┌──────────────────┐  high address
+│  main() frame    │  x, v, s, gpio
+├──────────────────┤
+│  foo() frame     │  local, temp
+├──────────────────┤
+│  bar() frame     │  i, j        ← sp (stack pointer) points here
+└──────────────────┘  low address
 
-- HW pretends to be memory [TODO]
+bar() returns → sp moves up → bar's frame is gone
+foo() returns → sp moves up → foo's frame is gone
+```
 
-Write to 0x20000004 (SRAM):
-  CPU → bus → SRAM cell → stores bits in transistors
-  Read back → same bits you wrote
-  It's MEMORY — passive storage
+### What is the heap?
 
-Write to 0x40020014 (GPIO ODR):
-  CPU → bus → GPIO peripheral → drives electrical pins HIGH/LOW
-  Read back → current pin states (might differ from what you wrote!)
-  It's HARDWARE — active logic that DOES things
+Memory pool managed by `malloc`/`free` (C) or `new`/`delete` (C++).
+Allocate/free by user or smart containers (`std::vector<T>`, `std::unique_ptr<T>`).
 
-## new
+The allocator (`libmalloc`) maintains a **free-list** — a `linked list` stored inside freed heap blocks:
+- `head` pointer: lives in allocator globals (`.data`)
+- `next` pointers: live inside each freed block (reusing the now-unused data area)
 
-- calls `malloc` to grab heap memory
-- calls the constructor on the memory when `pin` itself on the stack
-- memory leak without `delete heap`
-- avoided as heap is involved
+```
+.data (allocator global)              HEAP (freed blocks)
+┌────────────┐
+│ free_head ─┼──→ ┌──────────┐    ┌──────────┐    ┌──────────┐
+└────────────┘    │ size=16  │    │ size=64  │    │ size=32  │
+                  │ next ────┼───→│ next ────┼───→│ next=nil │
+                  └──────────┘    └──────────┘    └──────────┘
+                  0xC000          0xD000          0xE000
+```
 
-## ref
+- `malloc(20)`: walk free-list → find block ≥ 20B → split → return pointer
+- `free(ptr)`: mark block unused → write `next` pointer into it → re-link list
 
-- a compile time reference for the object
+### Constructor and destructor
+
+```cpp
+{
+    std::vector<int> v = {1, 2, 3};
+    // constructor runs: malloc(12), copy {1,2,3} into heap block
+    // v.ptr → heap, v.size = 3
+
+    // ... use v ...
+
+}   // ← scope ends here
+    // destructor runs automatically: free(v.ptr)
+    // heap block is returned to the allocator
+```
+
+This is why smart containers (string, vector, unique_ptr) **cannot be memcpy'd** —
+`memcpy` blindly copies stack bytes (ptr, size, cap), so both src and dest hold the same heap pointer
+→ both destructors call `free()` on it → double free.
+
+### Trivial vs non-trivial types
+
+- **Trivial** — no constructor, no destructor, no virtual methods. Raw bytes. `memcpy` is safe.
+  - `int`, `double`, `float`, `char`, `int[N]`, `struct { double x, y; }`
+- **Non-trivial (resource-managing)** — ctor allocates heap, dtor frees it. `memcpy` → double free.
+  - `std::string`, `std::vector<T>`, `std::unique_ptr<T>`
+- **Runtime Polymorphism by `virtual`** 
+  - vtable stores the base-to-derived relationship
+  - base / derived both use vptr to point to their virtual table
+  - `memcpy` → wrong vptr → virtual calls jump to garbage.
+
+```cpp
+static_assert is a compile time check has no burden on runtime
+#include <type_traits>
+static_assert(std::is_trivially_copyable_v<double>);        // ✓
+static_assert(std::is_trivially_copyable_v<int[4]>);        // ✓
+static_assert(!std::is_trivially_copyable_v<std::string>);  // ✓ not trivial
+```
+
+---
+
+## Full memory layout — where everything lives
+
+```
+High address
+┌─────────────────────────────────────────────────────────────────┐
+│                          STACK                                  │
+│  grows ↓                                                        │
+│                                                                 │
+│  ┌─ main() frame ────────────────────────────────────────────┐  │
+│  │  int x = 5;                    // [4 bytes: 5]            │  │
+│  │  int arr[4] = {1,2,3,4};      // [16 bytes: 1,2,3,4]     │  │
+│  │  Point pt = {1.0, 2.0};       // [16 bytes: 1.0, 2.0]    │  │
+│  │                                                           │  │
+│  │  std::string s = "hello";     // [24 bytes: ptr,size,cap] ───┐
+│  │  std::vector<int> v = {1,2};  // [24 bytes: ptr,size,cap] ──┐│
+│  │  std::unique_ptr<Foo> up;     // [8 bytes: ptr] ───────────┐││
+│  │                                                           │││
+│  │  IGpio* gpio = new Stm32Gpio; // [8 bytes: ptr] ──────┐  │││
+│  │                                                        │  │││
+│  │  ─── ALL above freed when main() returns ───          │  │││
+│  └───────────────────────────────────────────────────────┘  │││
+│                                                              ││││
+│  ┌─ foo() frame ────────────────────────────────────────┐    ││││
+│  │  int local = 10;             // [4 bytes]            │    ││││
+│  │  ─── freed when foo() returns ───                    │    ││││
+│  └──────────────────────────────────────────────────────┘    ││││
+│                          ↓                                   ││││
+│                      (free space)                            ││││
+│                          ↑                                   ││││
+├─────────────────────────────────────────────────────────────────┤
+│                          HEAP                                ││││
+│  grows ↑                                                     ││││
+│                                                              ││││
+│  ┌──────────────────────────────────────────┐                ││││
+│  │  0xA000: Stm32Gpio object       ◄────────────────────────┘│││
+│  │    [vptr → vtable]  8 bytes                                │││
+│  │    [reg_]           8 bytes                                │││
+│  │    [pin_]           1 byte + padding                       │││
+│  │    freed by: delete gpio  (or unique_ptr destructor)       │││
+│  ├──────────────────────────────────────────┤                 │││
+│  │  0xB000: Foo object              ◄─────────────────────────┘││
+│  │    freed by: unique_ptr destructor (automatic)              ││
+│  ├──────────────────────────────────────────┤                  ││
+│  │  0xC000: [1, 2]  (8 bytes)      ◄──────────────────────────┘│
+│  │    freed by: vector destructor (automatic)                   │
+│  ├──────────────────────────────────────────┤                   │
+│  │  0xD000: "hello\0"  (6 bytes)   ◄───────────────────────────┘
+│  │    freed by: string destructor (automatic)
+│  └──────────────────────────────────────────┘
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  .bss   (zero-initialized globals/statics)                      │
+│    static int count;              // [4 bytes: 0]               │
+│    ─── lives entire program ───                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  .data  (initialized globals/statics)                           │
+│    int g_mode = 1;                // [4 bytes: 1]               │
+│    static double cal = 3.14;      // [8 bytes: 3.14]           │
+│    ─── lives entire program ───                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  .rodata (read-only constants)                                  │
+│    const char* msg = "hello";     // string literal lives here  │
+│    vtable for Stm32Gpio           // [array of fn pointers]     │
+│    vtable for IGpio               // [array of fn pointers]     │
+├─────────────────────────────────────────────────────────────────┤
+│  .text  (compiled code)                                         │
+│    main(), foo(), Stm32Gpio::set(), ...                         │
+└─────────────────────────────────────────────────────────────────┘
+Low address
+```
+
+---
+
+## Copy vs move — by type
+
+### Trivial types — memcpy is the entire operation
+
+```cpp
+int a = 5;
+int b = a;          // compiler emits: memcpy(&b, &a, 4)  — done
+```
+
+```
+Stack:                   Stack:
+┌─────┐                 ┌─────┐  ┌─────┐
+│ a=5 │   ──copy 4B──►  │ a=5 │  │ b=5 │   independent copies
+└─────┘                 └─────┘  └─────┘
+```
+
+Same for: `double`, `float`, `int[N]`, any struct with no constructor/destructor.
+No constructor called. No destructor needed. Bitwise copy = correct.
+`std::move` on trivial types does nothing extra — copy and move are identical.
+
+### Non-trivial types — constructor must run, NOT memcpy
+
+```cpp
+std::vector<int> a = {1, 2, 3};
+```
+
+```
+Stack              Heap
+┌──────────┐      ┌─────────┐
+│ a.ptr ───┼─────→│ [1,2,3] │  0xC000
+│ a.size=3 │      └─────────┘
+│ a.cap=3  │
+└──────────┘
+```
+
+#### Copy: `vector<int> b = a;`
+
+```
+Stack              Heap
+┌──────────┐      ┌─────────┐
+│ a.ptr ───┼─────→│ [1,2,3] │  0xC000  (a's data, unchanged)
+│ a.size=3 │      └─────────┘
+└──────────┘      ┌─────────┐
+┌──────────┐      │ [1,2,3] │  0xD000  (NEW allocation)
+│ b.ptr ───┼─────→└─────────┘
+│ b.size=3 │
+└──────────┘
+
+Copy constructor: allocate new heap block, memcpy the CONTENTS
+Cost: malloc() + memcpy(N elements)
+w/o malloc() allocating new heap block -> heap double free 
+```
+
+#### Move: `vector<int> b = std::move(a);`
+
+```
+Stack              Heap
+┌──────────┐
+│ a.ptr=nil│      ┌─────────┐
+│ a.size=0 │      │ [1,2,3] │  0xC000  (same block, new owner)
+└──────────┘      └─────────┘
+┌──────────┐           ↑
+│ b.ptr ───┼───────────┘
+│ b.size=3 │
+└──────────┘
+
+Move constructor: steal pointer, null source
+Cost: 3 pointer/int assignments (24 bytes)
+a is still alive and valid — just empty
+```
+
+---
+
+## Virtual method calls — vtable layout
+
+```cpp
+IGpio* gpio = new Stm32Gpio(reg, 5);
+gpio->set(true);   // which set() gets called?
+```
+
+- new() -> base ctor links base vtable -> derived ctor overrides with derived vtable 
+
+```
+.rodata (compiled into binary, lives forever):
+┌─────────────────────────────────────────────┐
+│  vtable for Stm32Gpio:                       │
+│    [0] → Stm32Gpio::~Stm32Gpio()  (.text)   │
+│    [1] → Stm32Gpio::set()         (.text)   │
+│    [2] → Stm32Gpio::read()        (.text)   │
+└─────────────────────────────────────────────┘
+
+Heap:
+┌─────────────────────────┐
+│  vptr ──→ vtable above  │  8 bytes (hidden first field)
+│  reg_ = 0x40020014      │  8 bytes
+│  pin_ = 5               │  1 byte + 7 padding
+└─────────────────────────┘
+
+gpio->set(true) compiles to:
+  1. Load vptr from object     (memory read)
+  2. Load vtable[1]            (memory read — get Stm32Gpio::set address)
+  3. Call that address          (indirect branch)
+
+vs. non-virtual call:
+  1. Call Stm32Gpio::set()     (direct branch — address known at compile time)
+
+Cost: 2 extra memory reads + indirect branch ≈ ~5ns overhead
+```
+
+---
+
+### Rules of thumb
+
+- Local variable → stack (automatic, fast, no leak possible)
+- Global / `static` → .data or .bss (lives forever)
+- `new` / `malloc` → heap (manual or smart-pointer managed)
+- String literals (`"hello"`) → .rodata (compiled in, read-only)
+- vtables → .rodata (one per class, compiled in)
+- Code → .text (compiled in, read-only, executable)
+- If a type has a destructor → don't `memcpy`, use copy/move constructors
+- In embedded (MCU) → avoid heap entirely, use static allocation
+
+---
+
+## Operations quick-reference
+
+### Pointer vs reference vs value
+
+```cpp
+int x = 5;           // value on STACK — owns data directly
+int* p = &x;         // pointer on STACK — holds address of x (8 bytes on 64-bit)
+int& r = x;          // reference — alias, not a separate object, no extra memory
+
+int* h = new int(10); // pointer on STACK (8 bytes) → data on HEAP (4 bytes)
+```
+
+**Key distinction**: `sizeof(std::vector<int>)` gives the stack footprint (~24 bytes: ptr+size+cap), NOT the heap data size. Use `.size()` for the logical element count.
+
+### lvalue vs rvalue
+
+```cpp
+int x = 5;              // x is an lvalue — named, has address, persists
+                         // 5 is an rvalue — temporary, no lasting identity
+
+process(x);              // binds to int& (lvalue ref)
+process(5);              // binds to int&& (rvalue ref)
+process(std::move(x));   // std::move CASTS x to rvalue ref — does NOTHING at runtime
+                         // it's your move constructor's job to actually steal resources
+```
+
+### What `memcpy` actually copies
+
+`memcpy` operates on **stack bytes only**. For `std::vector`, those bytes include the internal heap pointer value. After `memcpy`, both objects hold the same pointer → same heap block → double free on destruction.
+
+```
+memcpy(&b, &a, sizeof(vector)):
+  Copies: [ptr | size | capacity]  ← stack bytes (24 bytes)
+  Does NOT: allocate new heap, copy elements, or null source
+  Result: a.ptr == b.ptr → DOUBLE FREE
+```
+
+For `memcpy(dest_buf, src_buf, N * sizeof(int))` (copying between raw heap buffers via `.data()` pointers) — this IS safe because you're copying the actual element data, not the owning object.
+
+### `std::move` — what it does and doesn't do
+
+- std::move(x) is equivalent to: static_cast<T&&>(x)
+- casts to rvalue reference
+- After `std::move(x)`, `x` is still a valid object in a "moved-from" state (can be destroyed or reassigned, but content is unspecified)
+
+### Constructor dispatch
+
+The compiler selects constructors based on value category of the argument:
+
+```cpp
+Buffer a(100);               // Buffer(int n)        — normal ctor
+Buffer b = a;                // Buffer(const Buffer&) — copy ctor (a is lvalue)
+Buffer c = std::move(a);     // Buffer(Buffer&&)      — move ctor (rvalue ref)
+```
+
+### `const`, `volatile`, `inline` — compiler/linker effects
+
+| Keyword | Affects | Purpose |
+|---|---|---|
+| `const` (on variable) | compiler | prevents modification, enables placing in `.rodata` |
+| `const` (after method) | compiler | method can be called on `const&` objects; use `mutable` for exceptions |
+| `volatile` | compiler | prevents read/write elimination — every access emits a real load/store |
+| `inline` | linker symbol | changes symbol from strong (`T`) to weak (`W`) — allows multiple definitions |
+| `constexpr` | compiler | enables compile-time evaluation; implies `inline` |
+| `#define` MACRO | preprocessor | textual substitution in `.ii` — no symbol, no type safety |
+
 
 # C++ build pipeline
 
@@ -236,11 +491,31 @@ Source Code          Stage 1          Stage 2          Stage 3          Stage 4
   main.cpp    main.ii          main.s           main.o           cvd_controller
   (text)      (expanded text)  (assembly text)  (machine code)   (runnable binary)
 
-## 1. Preprocess cpp
+Stage 1: PREPROCESS — cpp (or g++ -E)
 
-- #include parts of .cpp are expanded by including .h into .ii
+    - #include parts of .cpp are expanded by including .h into .ii
+    - CMake's target_include_directories becomes the -I flag
+    - cpp -I src/common src/controller/main.cpp -o main.ii
+    - g++ -E -I src/common src/controller/main.cpp -o main.ii
 
-## 2. Complie cc1plus
+Stage 2: COMPILE — g++ -S
+
+    - g++ -S -std=c++17 -I src/common src/controller/main.cpp -o main.s
+
+Stage 3: ASSEMBLE — g++ -c (or 'as')
+
+    - g++ -c -std=c++17 -I src/common src/controller/main.cpp -o main.o
+
+Stage 4: LINK — g++ (calls ld internally)
+
+    - g++ main.o -o main
+
+All at once
+
+    - g++ -std=c++17 -I src/common src/controller/main.cpp -o main
+
+
+## 2. Compilation details
 
 - Lexing & Parser
     - Tokenize source → build Abstract Syntax Tree (AST)
@@ -261,33 +536,32 @@ Source Code          Stage 1          Stage 2          Stage 3          Stage 4
 - Struct layout
     - Compute field offsets: temperature is at byte 12 from struct start
 - Stack frame layout
-    - Decide where each local variable lives relative to rsp
+    - Decide where each local variable lives relative to Register Stack Pointer
 
-### inline and constexpr
+### inline and constexpr and Inlining compiler decision
 
-- inline in c++ stays inline in assembly achieves cross boundary optimization
-- inline avoid the fn-calling bl (branch-and-link) asembly intruction overhead
-- why not all inline
-    - too much inline expand the file size so it failover to the next slower cache
-- g++ -O2 will inline small fns without `inline` keyword
-- Core meaning
-    - runtime selection of compiler on which definition
-    - "Can be evaluated at compile time"
-- Compiler
-    - `-O2` inlines small fns automatically
-    - folds obvious compile-time const
-- Edge
+- `inline`, `constexpr`, `template` all produce weak symbols → all ODR-safe in headers
+    - each .o carries a copy, linker keeps one, discards duplicates
+    - any definition placed in .h MUST be one of these, otherwise ODR violation
+- `constexpr` → implies `inline` (weak symbol) + CAN evaluate at compile time
+    - `constexpr int x = factorial(5);` → computed by compiler, no runtime call
+    - runtime args → falls back to normal (inlined) function call
+- Inlining (body expanded at call site, no `bl`) is a compiler optimization
+    - `-O2` inlines small fns automatically regardless of `inline` keyword
+    - too much inlining bloats code → cache misses → slower
+    - `-O2` also folds obvious compile-time constants -> obvious calculation
+    - `volatile` enforce compiler to not fold
 
 ### const mutable volatile atomic
 
-- `const` fns donot change the obj
+- `const` fns do not change the obj
 - `mutable` var of an obj can change under `const` fns
     - [TODO] caching, logging, counters, mutexes
 - `volatile` Inform compiler this variable can change outside your view
     - memory-mapped HW registers
-    - signal modifing
-- std::atomic<T> adds thread-safe read/write + memory ordering
-- atomic is a single CPU instru `dmb  ish` over the complex std::mutex
+    - signal modifying
+- std::atomic<T> adds thread-safe read/write + memory ordering to `volatile`
+- atomic is a single CPU instruction `dmb  ish` over the complex std::mutex
     - atomic is lock_free while mutex is not
     - dmb  ish  drains all pending write before continue
 - atomic<BigStruct> falls back to mutex for speed
@@ -296,68 +570,26 @@ Source Code          Stage 1          Stage 2          Stage 3          Stage 4
 
 ## 4. Link ld
 
-Linker resolves symbols by name — it does not re-check types.
-If two .o files were compiled with different versions of the same .h
-you get ODR violations (undefined behavior, no error).
+- Linker resolves compile-yielded symbols by name — it does not re-check types.
+- ODR happens when 2 .o is compiled with version-diff shared.h
+- .o (object file)
+    - Symbols: unresolved (U = undefined)
+    - Not loadable at runtime
+    - Contains one .cpp's machine code
+    - Position-independent: not required
+    - Used by linker (ld) at build time
+- .so / .dylib (shared library)
+    - Symbols: all resolved
+    - Loadable at runtime (dlopen / ctypes.CDLL)
+    - Contains linked, complete library
+    - Position-independent: yes, needs `-fPIC`
+    - Used by OS loader at runtime
+    - `extern "C"` required for Python/C interop (no mangling)
+    - `g++ -std=c++17 -shared -fPIC pid_lib.cpp -o libpid.dylib`
 
-
-## This project cpp run
-
-cd /Users/hsunwenfang/Documents/semifabhw
-
-# Stage 1: PREPROCESS — cpp (or g++ -E)
-# CMake's target_include_directories becomes the -I flag
-cpp -I src/common src/controller/main.cpp -o main.ii
-# or equivalently:
-g++ -E -I src/common src/controller/main.cpp -o main.ii
-# → main.ii has ~50,000 lines (all headers expanded)
-
-# Stage 2: COMPILE — g++ -S
-g++ -S -std=c++17 -I src/common src/controller/main.cpp -o main.s
-# → main.s is x86 assembly text
-
-# Stage 3: ASSEMBLE — g++ -c (or 'as')
-g++ -c -std=c++17 -I src/common src/controller/main.cpp -o main.o
-# → main.o is machine code with unresolved symbols
-
-# Stage 4: LINK — g++ (calls ld internally)
-g++ main.o -o cvd_controller
-# → cvd_controller is the runnable binary
-
-# Or all at once (what CMake actually generates):
-g++ -std=c++17 -I src/common src/controller/main.cpp -o cvd_controller
-
-
-## g++ invoke binaries
-
-g++ -v -std=c++17 -I src/common src/controller/main.cpp -o main 2>&1
-Apple clang version 17.0.0 (clang-1700.6.3.2)
-Target: arm64-apple-darwin25.4.0
-Thread model: posix
-InstalledDir: /Library/Developer/CommandLineTools/usr/bin
-ignoring nonexistent directory "/Library/Developer/CommandLineTools/usr/bin/../include/c++/v1"
-
-## -std=c++17 & POSIX & lib c
-
-- std flag specifies which path stds should be found
-- POSIX libs are OS specfic and can be checked by `g++ -###`
-Aspect	std:: (C++)	libc (C)	POSIX
-Defined by	ISO C++ committee	ISO C committee	IEEE / Open Group
-Name mangling	Yes (_ZSt5clamp...)	No (memcpy)	No (signal)
-Namespace	std::	std:: or global	Global only
-Templates/overloads	Yes	No	No
-Talks to kernel	Rarely	Sometimes (malloc)	Almost always
-Portable to Windows	Yes (MSVC)	Yes (MSVC)	No
-
-## struct and class
-
-- Identical except struct is public by default and class is private
-
-
-## Mangling and symbol
+### Mangling and symbol
 
 - One executable, one symbol
-
 - Mangling distinguish the over loaded function name in C++
    _ZN3PID7computeEddd
     ││ │   │      ││││
@@ -369,27 +601,71 @@ Portable to Windows	Yes (MSVC)	Yes (MSVC)	No
     └─────────────────── _Z = C++ mangled
 - `extern "C" void handle_signal(int sig);` disable mangling so the symbol is `handle_signal` only
 - `nm main.o`
-    - T Your functions defined here:
-    - t Static/inlined functions (local):
-    - b Static local data:
-    - r String literals and constants:
-    - U Functions your code calls but doesn't define:
-    - W Weak symbols (compiler-generated):
+    - `T` global function / `t` static (internal linkage) function
+    - `b` static local data
+    - `r` string literals and constants
+    - `U` undefined — should be linked at link time
+    - `W` weak symbols — inline, constexpr, template
 - weak symbols
-    - inline funtions are intrinsically weak
+    - inline functions are intrinsically weak
     - compiler randomly keep one of the multiple conflicting weak symbols
+
+## g++ invoke binaries
+
+g++ -v -std=c++17 -I src/common src/controller/main.cpp -o main 2>&1
+Apple clang version 17.0.0 (clang-1700.6.3.2)
+Target: arm64-apple-darwin25.4.0
+Thread model: posix
+InstalledDir: /Library/Developer/CommandLineTools/usr/bin
+
+## -std=c++17 & POSIX & lib c
+
+- std flag specifies which path stds should be found
+- POSIX libs are OS specific and can be checked by `g++ -###`
+- std:: (C++)
+    - Defined by ISO C++ committee
+    - Name mangling: yes (`_ZSt5clamp...`)
+    - Namespace: `std::`
+    - Templates/overloads: yes
+    - Talks to kernel: rarely
+    - Portable to Windows: yes (MSVC)
+- libc (C)
+    - Defined by ISO C committee
+    - Name mangling: no (`memcpy`)
+    - Namespace: `std::` or global
+    - Templates/overloads: no
+    - Talks to kernel: sometimes (`malloc`)
+    - Portable to Windows: yes (MSVC)
+- POSIX
+    - Defined by IEEE / Open Group
+    - Name mangling: no (`signal`)
+    - Namespace: global only
+    - Templates/overloads: no to support both C and C++
+    - Talks to kernel: almost always
+    - Portable to Windows: no
+
+## struct and class
+
+- Identical except struct is public by default and class is private
+- Convention: `struct` for passive data (all public fields, no invariants)
+- Convention: `class` when there are invariants, private state, or methods that enforce rules
 
 ## Headers file
 
-- <T> must be in .h as they are weak and unimplemented
+- `<T>` must be in .h because compiler needs the body to instantiate per type
+    - escape hatch: explicit instantiation in one .cc keeps template body out of header
+- any non-template definition in .h must be marked `inline` to be ODR-safe
+    - class member functions defined inside class body are implicitly `inline`
+- `#ifndef FOO_H_` / `#define FOO_H_` / `#endif` guard prevents multiple inclusion
 - one .h for all .cpp can avoid ODR (One Definition Rule)
-    - Bazel / CMake guarantees single header version
+    - Bazel / CMake guarantees single header version so ODR is avoided
 
 ### unity build
 
 ### __restrict 
 
-- these pointers donot reference one another during function call -> compiler friendly
+- these pointers do not reference one another during function call
+- donot bl hence compiler friendly
 
 int		getaddrinfo(const char * __restrict, const char * __restrict,
 			    const struct addrinfo * __restrict,

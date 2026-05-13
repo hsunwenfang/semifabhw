@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>cplusplus.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="types-and-auto">Types and Auto</h1>
+<h2 id="cast">Cast</h2>
+<ul>
+<li><code>static_cast</code> — Compiler-checked, zero cost → CRTP, enum conversion</li>
+<li><code>dynamic_cast</code> — Runtime-checked, vtable lookup → Not used (avoid in embedded)</li>
+<li><code>reinterpret_cast</code> — Unchecked, zero cost → <code>Reg&lt;Addr&gt;</code> int → pointer</li>
+<li><code>const_cast</code> — Unchecked, zero cost → can cast away const but not used</li>
+</ul>
+<h2 id="rvalue-and-lvalue">rvalue and lvalue</h2>
+<ul>
+<li>lvalue has a persistent address in mem so can be pointed to</li>
+<li>rvalue is only temporary exists during evaluation</li>
+<li>&amp; test : &amp; get the address outof lvalue while rvalue cannot</li>
+<li>T&amp; -&gt; lvalue reference -&gt; alias to variable</li>
+<li>const T&amp; -&gt; const lvalue reference applicable for rvalue -&gt; read-only alias</li>
+<li>T&amp;&amp; -&gt; rvalue reference -&gt; ori value points to nullptr</li>
+</ul>
+<h2 id="function-pointer">function pointer</h2>
+<pre class="hljs"><code><div><span class="hljs-comment">/*
+ * For historical reasons; programs expect signal&#x27;s return value to be
+ * defined by &lt;sys/signal.h&gt;.
+ */</span>
+<span class="hljs-function">__BEGIN_DECLS
+<span class="hljs-title">void</span><span class="hljs-params">(*signal(<span class="hljs-type">int</span>, <span class="hljs-type">void</span> (*)(<span class="hljs-type">int</span>)))</span><span class="hljs-params">(<span class="hljs-type">int</span>)</span></span>;
+__END_DECLS
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span>  <span class="hljs-comment">/* !_SYS_SIGNAL_H_ */</span></span>
+</div></code></pre>
+<ul>
+<li>void(*)(int) - pointer to a fn taking int returns void -&gt; fn_ptr</li>
+<li>signal is inputted int &amp; fn_ptr and output fn_ptr</li>
+</ul>
+<h1 id="polymorphism">Polymorphism</h1>
+<p><code>class Stm32Gpio : public IGpio {</code></p>
+<ul>
+<li>public : <code>IGpio&amp; ref = stm32_obj;</code> → private does not allow this</li>
+</ul>
+<h2 id="class-struct-and-namespace">class, struct and namespace</h2>
+<h3 id="namespace-vs-struct">namespace vs struct</h3>
+<ul>
+<li>namespace can be extended anywhere so,</li>
+<li>namespace cannot have <code>template</code> parameters, unlike the locally closed struct</li>
+</ul>
+<pre class="hljs"><code><div><span class="hljs-keyword">template</span>&lt;<span class="hljs-type">uint32_t</span> Addr&gt;
+<span class="hljs-keyword">struct</span> <span class="hljs-title class_">Reg</span> {
+    <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-keyword">volatile</span> <span class="hljs-type">uint32_t</span>&amp; <span class="hljs-title">ref</span><span class="hljs-params">()</span> </span>{
+        <span class="hljs-keyword">return</span> *<span class="hljs-built_in">reinterpret_cast</span>&lt;<span class="hljs-keyword">volatile</span> <span class="hljs-type">uint32_t</span>*&gt;(Addr);
+    }
+    <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">void</span> <span class="hljs-title">set_bits</span><span class="hljs-params">(<span class="hljs-type">uint32_t</span> mask)</span> </span>{ <span class="hljs-built_in">ref</span>() |= mask; }
+    <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">void</span> <span class="hljs-title">clear_bits</span><span class="hljs-params">(<span class="hljs-type">uint32_t</span> mask)</span> </span>{ <span class="hljs-built_in">ref</span>() &amp;= ~mask; }
+};
+
+<span class="hljs-comment">// Usage</span>
+<span class="hljs-keyword">constexpr</span> <span class="hljs-type">uint32_t</span> GPIOA_ODR = <span class="hljs-number">0x40020014</span>;
+Reg&lt;GPIOA_ODR&gt;::<span class="hljs-built_in">set_bits</span>(<span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">5</span>);  <span class="hljs-comment">// set pin 5 high</span>
+</div></code></pre>
+<pre class="hljs"><code><div>Address        Byte
+0x40020014  →  byte 0 (bits 0-7)    ← pins 0-7
+0x40020015  →  byte 1 (bits 8-15)   ← pins 8-15
+0x40020016  →  byte 2 (bits 16-23)  ← pins 16-23
+0x40020017  →  byte 3 (bits 24-31)  ← pins 24-31
+</div></code></pre>
+<h2 id="virtual-and-override">virtual and override</h2>
+<ul>
+<li>virtual prefixed parent method should be overridden by child method</li>
+<li>virtual uint64_t micros() = 0; -&gt; <code>=0</code> means pure virtual where base cannot provide implementation</li>
+<li>override-suffixed child method lets compiler safety check
+<ul>
+<li>w/o override may cause wrong parameter</li>
+</ul>
+</li>
+<li>compiler stores virtual parent fns in vtable</li>
+<li>Cost : child fns points to the parent fns in vtable + indirect call when virtual function call</li>
+</ul>
+<h2 id="dependency-injection---polymorphism-at-consumer">dependency injection -&gt; polymorphism at consumer</h2>
+<pre class="hljs"><code><div><span class="hljs-comment">// a specific address</span>
+<span class="hljs-keyword">constexpr</span> <span class="hljs-type">uint32_t</span> GPIOA_ODR = <span class="hljs-number">0x40020014</span>;
+<span class="hljs-function">Stm32Gpio <span class="hljs-title">led</span><span class="hljs-params">(GPIOA_ODR, <span class="hljs-number">5</span>)</span></span>;
+</div></code></pre>
+<pre class="hljs"><code><div><span class="hljs-comment">// when Stm32Gpio is the only child</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">blink</span><span class="hljs-params">(Stm32Gpio&amp; led)</span> </span>{led.<span class="hljs-built_in">set</span>(<span class="hljs-literal">true</span>); }
+<span class="hljs-comment">// 1 runtime polymorphism</span>
+<span class="hljs-comment">// vtable lookup, works with any GPIO</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">blink</span><span class="hljs-params">(IGpio&amp; led)</span> </span>{led.<span class="hljs-built_in">set</span>(<span class="hljs-literal">true</span>); }
+</div></code></pre>
+<h2 id="compile-time-polymorphism">compile time polymorphism</h2>
+<pre class="hljs"><code><div><span class="hljs-comment">// 2 duck-typing compile time polymorphism</span>
+<span class="hljs-comment">// no vtable -&gt; can be constexpr &amp; no base class</span>
+<span class="hljs-comment">// but keep one fns copy per type and no mixed typed arr</span>
+<span class="hljs-function"><span class="hljs-keyword">template</span>&lt;<span class="hljs-keyword">typename</span> Gpio&gt;
+<span class="hljs-type">void</span> <span class="hljs-title">blink</span><span class="hljs-params">(Gpio&amp; led)</span> </span>{led.<span class="hljs-built_in">set</span>(<span class="hljs-literal">true</span>); }
+
+<span class="hljs-comment">// 3 CRTP</span>
+<span class="hljs-comment">// no mixed typed arr</span>
+<span class="hljs-comment">// GpioBase&lt;Stm32Gpio&gt; and GpioBase&lt;NrfGpio&gt; are different essentially</span>
+<span class="hljs-keyword">template</span>&lt;<span class="hljs-keyword">typename</span> Derived&gt;
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">GpioBase</span> {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-comment">// toggle body is identical for all derived</span>
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">toggle</span><span class="hljs-params">()</span> </span>{
+        <span class="hljs-comment">// cast base [this] -&gt; derived [self]</span>
+        <span class="hljs-keyword">auto</span>&amp; self = <span class="hljs-built_in">static_cast</span>&lt;Derived&amp;&gt;(*<span class="hljs-keyword">this</span>);
+        self.<span class="hljs-built_in">set</span>(!self.<span class="hljs-built_in">read</span>());
+    }
+};
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Stm32Gpio</span> : <span class="hljs-keyword">public</span> GpioBase&lt;Stm32Gpio&gt; {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">set</span><span class="hljs-params">(<span class="hljs-type">bool</span> high)</span> </span>{ <span class="hljs-comment">/* register write */</span> }
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">read</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> <span class="hljs-comment">/* register read */</span>; }
+    <span class="hljs-comment">// toggle() inherited from GpioBase — calls Stm32Gpio::set/read directly</span>
+};
+</div></code></pre>
+<h1 id="memory-structure">Memory Structure</h1>
+<h2 id="bus-routing">Bus routing</h2>
+<pre class="hljs"><code><div>CPU issues: STORE 0x40020014, value=0x20
+
+Bus matrix checks upper bits:
+  0x4002xxxx → &quot;that's APB2 peripheral bus → GPIO port A&quot;
+
+         ┌─────────┐
+CPU ────→│  Bus     │──→ 0x0000_0000–0x1FFF_FFFF → Flash controller
+         │  Matrix  │──→ 0x2000_0000–0x3FFF_FFFF → SRAM controller
+         │ (decoder)│──→ 0x4000_0000–0x5FFF_FFFF → Peripheral bus (APB/AHB)
+         │          │──→ 0xE000_0000–0xFFFF_FFFF → Debug/system (NVIC, SysTick)
+         └─────────┘
+</div></code></pre>
+<h2 id="stack-frame">Stack frame</h2>
+<p>Every function call pushes a <strong>frame</strong> onto the stack containing:</p>
+<ul>
+<li>Return address (where to go when function ends)</li>
+<li>Arguments passed to the function</li>
+<li>Local variables declared inside the function</li>
+</ul>
+<p>When the function returns, the frame is <strong>popped</strong> — all locals are destroyed instantly. This is why stack allocation is one instruction (<code>sub sp, #size</code>) and free is one instruction (<code>add sp, #size</code>).</p>
+<pre class="hljs"><code><div>call chain: main() → foo() → bar()
+
+Stack (grows downward):
+┌──────────────────┐  high address
+│  main() frame    │  x, v, s, gpio
+├──────────────────┤
+│  foo() frame     │  local, temp
+├──────────────────┤
+│  bar() frame     │  i, j        ← sp (stack pointer) points here
+└──────────────────┘  low address
+
+bar() returns → sp moves up → bar's frame is gone
+foo() returns → sp moves up → foo's frame is gone
+</div></code></pre>
+<h2 id="heap">Heap</h2>
+<p>A large pool of memory managed by <code>malloc</code>/<code>free</code> (C) or <code>new</code>/<code>delete</code> (C++).
+The allocator maintains a free-list to track available blocks — this bookkeeping is why heap allocation is ~100× slower than stack.</p>
+<h2 id="trivial-vs-non-trivial-with-construtor-and-destructor">Trivial vs non-trivial with construtor and destructor</h2>
+<ul>
+<li><strong>Trivial</strong> — no constructor, no destructor, no virtual methods. Raw bytes. <code>memcpy</code> is safe.
+<ul>
+<li><code>int</code>, <code>double</code>, <code>float</code>, <code>char</code>, <code>int[N]</code>, <code>struct { double x, y; }</code></li>
+</ul>
+</li>
+<li><strong>Non-trivial</strong> — has constructor/destructor that manages resources. Must use copy/move constructors.
+<ul>
+<li><code>std::string</code>, <code>std::vector&lt;T&gt;</code>, <code>std::unique_ptr&lt;T&gt;</code>, any class with <code>virtual</code></li>
+<li><code>memcpy</code> a non-trivail var doubles the constructor / destructor -&gt; may double free</li>
+</ul>
+</li>
+</ul>
+<h2 id="virtual-memory-layout">Virtual memory layout</h2>
+<ul>
+<li>Heap allocation / deallocation is slow due to bookkeeping</li>
+</ul>
+<pre class="hljs"><code><div>High address
+┌─────────────────────────────────────────────────────────────────┐
+│                          STACK                                  │
+│  grows ↓                                                        │
+│                                                                 │
+│  ┌─ main() frame ────────────────────────────────────────────┐  │
+│  │  int x = 5;                    // [4 bytes: 5]            │  │
+│  │  double d = 3.14;              // [8 bytes: 3.14]         │  │
+│  │  int arr[4] = {1,2,3,4};      // [16 bytes: 1,2,3,4]     │  │
+│  │  Point pt = {1.0, 2.0};       // [16 bytes: 1.0, 2.0]    │  │
+│  │                                                           │  │
+│  │  std::string s = &quot;hello&quot;;     // [24 bytes: ptr,size,cap] ───┐
+│  │  std::vector&lt;int&gt; v = {1,2};  // [24 bytes: ptr,size,cap] ──┐│
+│  │  std::unique_ptr&lt;Foo&gt; up;     // [8 bytes: ptr] ───────────┐││
+│  │                                                           │││
+│  │  IGpio* gpio = new Stm32Gpio; // [8 bytes: ptr] ──────┐  │││
+│  │                                                        │  │││
+│  │  ─── ALL above freed when main() returns ───          │  │││
+│  └───────────────────────────────────────────────────────┘  │││
+│                                                              ││││
+│  ┌─ foo() frame ────────────────────────────────────────┐    ││││
+│  │  int local = 10;             // [4 bytes]            │    ││││
+│  │  ─── freed when foo() returns ───                    │    ││││
+│  └──────────────────────────────────────────────────────┘    ││││
+│                          ↓                                   ││││
+│                      (`free space`)                          ││││
+│                          ↑                                   ││││
+├─────────────────────────────────────────────────────────────────┤
+│                          HEAP                                ││││
+│  grows ↑                                                     ││││
+│                                                              ││││
+│  ┌──────────────────────────────────────────┐                ││││
+│  │  0xA000: Stm32Gpio object       ◄────────────────────────┘│││
+│  │    [vptr → vtable]  8 bytes                                │││
+│  │    [reg_]           8 bytes                                │││
+│  │    [pin_]           1 byte + padding                       │││
+│  │    freed by: delete gpio  (or unique_ptr destructor)       │││
+│  ├──────────────────────────────────────────┤                 │││
+│  │  0xB000: Foo object              ◄─────────────────────────┘││
+│  │    freed by: unique_ptr destructor (automatic)              ││
+│  ├──────────────────────────────────────────┤                  ││
+│  │  0xC000: [1, 2]  (8 bytes)      ◄──────────────────────────┘│
+│  │    freed by: vector destructor (automatic)                   │
+│  ├──────────────────────────────────────────┤                   │
+│  │  0xD000: &quot;hello\0&quot;  (6 bytes)   ◄───────────────────────────┘
+│  │    freed by: string destructor (automatic)
+│  └──────────────────────────────────────────┘
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  .bss   (zero-initialized globals/statics)                      │
+│    static int count;              // [4 bytes: 0]               │
+│    ─── lives entire program ───                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  .data  (initialized globals/statics)                           │
+│    int g_mode = 1;                // [4 bytes: 1]               │
+│    static double cal = 3.14;      // [8 bytes: 3.14]           │
+│    ─── lives entire program ───                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  .rodata (read-only constants)                                  │
+│    const char* msg = &quot;hello&quot;;     // string literal lives here  │
+│    vtable for Stm32Gpio           // [array of fn pointers]     │
+│    vtable for IGpio               // [array of fn pointers]     │
+├─────────────────────────────────────────────────────────────────┤
+│  .text  (compiled code)                                         │
+│    main(), foo(), Stm32Gpio::set(), ...                         │
+└─────────────────────────────────────────────────────────────────┘
+Low address
+</div></code></pre>
+<h2 id="stack-vs-heap">Stack v.s. Heap</h2>
+<ul>
+<li>
+<p>Allocate</p>
+<ul>
+<li>Stack: Compiler automatically — 1 instruction (<code>sub sp, #size</code>)</li>
+<li>Heap: You, via <code>new</code> / <code>malloc</code> — hundreds of instructions (find free block, update bookkeeping)</li>
+</ul>
+</li>
+<li>
+<p>Freed by</p>
+<ul>
+<li>Stack: Automatically when function returns</li>
+<li>Heap: <code>delete</code> / <code>free</code></li>
+</ul>
+</li>
+<li>
+<p>Size</p>
+<ul>
+<li>OS gives small stack (8 MB) and large heap</li>
+</ul>
+</li>
+<li>
+<p>Fragmentation</p>
+<ul>
+<li>Stack: Never</li>
+<li>Heap: repeated alloc/free leaves gaps</li>
+</ul>
+</li>
+<li>
+<p>Size known at compile time → <code>double buf[256]</code> → Stack</p>
+</li>
+<li>
+<p>Size known at runtime, small → <code>alloca(n)</code> (non-standard) → Stack — but risky</p>
+</li>
+<li>
+<p>Size known at runtime, safe → <code>std::vector&lt;double&gt; v(n)</code> → Heap internally</p>
+</li>
+<li>
+<p>Size bounded but varies → <code>std::array&lt;double, MAX_N&gt;</code> → Stack — allocate worst case</p>
+</li>
+</ul>
+<h3 id="stack-sizes-by-platform">Stack sizes by platform</h3>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Default stack</th>
+<th>Typical concern</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>macOS (M2)</td>
+<td>8 MB per thread</td>
+<td>large arrays or deep recursion</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td>8 MB per thread</td>
+<td>same</td>
+</tr>
+<tr>
+<td>STM32 MCU</td>
+<td>1–8 KB</td>
+<td>every byte matters</td>
+</tr>
+<tr>
+<td>FreeRTOS task</td>
+<td>256 B–4 KB</td>
+<td><code>static_assert</code> on total budget</td>
+</tr>
+</tbody>
+</table>
+<h2 id="sram-vs-gpio-odr">SRAM vs GPIO ODR</h2>
+<ul>
+<li>HW pretends to be memory</li>
+</ul>
+<p>Write to 0x20000004 (SRAM):
+CPU → bus → SRAM cell → stores bits in transistors
+Read back → same bits you wrote
+It's MEMORY — passive storage</p>
+<p>Write to 0x40020014 (GPIO ODR):
+CPU → bus → GPIO peripheral → drives electrical pins HIGH/LOW
+Read back → current pin states (might differ from what you wrote!)
+It's HARDWARE — active logic that DOES things</p>
+<h2 id="new">new</h2>
+<ul>
+<li>calls <code>malloc</code> to grab heap memory</li>
+<li>calls the constructor on the memory when <code>pin</code> itself on the stack</li>
+<li>memory leak without <code>delete heap</code></li>
+<li>avoided as heap is involved</li>
+</ul>
+<h2 id="ref">ref</h2>
+<ul>
+<li>a compile time reference for the object</li>
+</ul>
+<h2 id="copy-vs-move--by-type">Copy vs move — by type</h2>
+<h3 id="trivial-types--memcpy-is-the-entire-operation">Trivial types — memcpy is the entire operation</h3>
+<pre class="hljs"><code><div><span class="hljs-type">int</span> a = <span class="hljs-number">5</span>;
+<span class="hljs-type">int</span> b = a;          <span class="hljs-comment">// compiler emits: memcpy(&amp;b, &amp;a, 4)  — done</span>
+</div></code></pre>
+<pre class="hljs"><code><div>Stack:                   Stack:
+┌─────┐                 ┌─────┐  ┌─────┐
+│ a=5 │   ──copy 4B──►  │ a=5 │  │ b=5 │   independent copies
+└─────┘                 └─────┘  └─────┘
+</div></code></pre>
+<p>Same for: <code>double</code>, <code>float</code>, <code>int[N]</code>, any struct with no constructor/destructor.
+No constructor called. No destructor needed. Bitwise copy = correct.
+<code>std::move</code> on trivial types does nothing extra — copy and move are identical.</p>
+<h3 id="non-trivial-types--constructor-must-run-not-memcpy">Non-trivial types — constructor must run, NOT memcpy</h3>
+<pre class="hljs"><code><div>std::vector&lt;<span class="hljs-type">int</span>&gt; a = {<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>};
+</div></code></pre>
+<pre class="hljs"><code><div>Stack              Heap
+┌──────────┐      ┌─────────┐
+│ a.ptr ───┼─────→│ [1,2,3] │  0xC000
+│ a.size=3 │      └─────────┘
+│ a.cap=3  │
+└──────────┘
+</div></code></pre>
+<h4 id="copy-vectorint-b--a">Copy: <code>vector&lt;int&gt; b = a;</code></h4>
+<pre class="hljs"><code><div>Stack              Heap
+┌──────────┐      ┌─────────┐
+│ a.ptr ───┼─────→│ [1,2,3] │  0xC000  (a's data, unchanged)
+│ a.size=3 │      └─────────┘
+└──────────┘      ┌─────────┐
+┌──────────┐      │ [1,2,3] │  0xD000  (NEW allocation)
+│ b.ptr ───┼─────→└─────────┘
+│ b.size=3 │
+└──────────┘
+
+Copy constructor: allocate new heap block, memcpy the CONTENTS
+Cost: malloc() + memcpy(N elements)
+</div></code></pre>
+<h4 id="move-vectorint-b--stdmovea">Move: <code>vector&lt;int&gt; b = std::move(a);</code></h4>
+<pre class="hljs"><code><div>Stack              Heap
+┌──────────┐
+│ a.ptr=nil│      ┌─────────┐
+│ a.size=0 │      │ [1,2,3] │  0xC000  (same block, new owner)
+└──────────┘      └─────────┘
+┌──────────┐           ↑
+│ b.ptr ───┼───────────┘
+│ b.size=3 │
+└──────────┘
+
+Move constructor: steal pointer, null source
+Cost: 3 pointer/int assignments (24 bytes)
+a is still alive and valid — just empty
+</div></code></pre>
+<h4 id="why-raw-memcpy-would-crash">Why raw memcpy would crash</h4>
+<pre class="hljs"><code><div>If you did raw memcpy(&amp;b, &amp;a, sizeof(vector)):
+  b.ptr = a.ptr = 0xC000   ← BOTH point to same heap!
+  a destructs → free(0xC000)
+  b destructs → free(0xC000) again → DOUBLE FREE → crash
+</div></code></pre>
+<h2 id="virtual-method-calls--vtable-layout">Virtual method calls — vtable layout</h2>
+<pre class="hljs"><code><div>IGpio* gpio = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Stm32Gpio</span>(reg, <span class="hljs-number">5</span>);
+gpio-&gt;<span class="hljs-built_in">set</span>(<span class="hljs-literal">true</span>);   <span class="hljs-comment">// which set() gets called?</span>
+</div></code></pre>
+<pre class="hljs"><code><div>.rodata (compiled into binary, lives forever):
+┌─────────────────────────────────────────────┐
+│  vtable for Stm32Gpio:                       │
+│    [0] → Stm32Gpio::~Stm32Gpio()  (.text)   │
+│    [1] → Stm32Gpio::set()         (.text)   │
+│    [2] → Stm32Gpio::read()        (.text)   │
+└─────────────────────────────────────────────┘
+
+Heap (the object):
+┌─────────────────────────┐
+│  vptr ──→ vtable above  │  8 bytes (hidden first field)
+│  reg_ = 0x40020014      │  8 bytes
+│  pin_ = 5               │  1 byte + 7 padding
+└─────────────────────────┘
+
+gpio-&gt;set(true) compiles to:
+  1. Load vptr from object     (memory read)
+  2. Load vtable[1]            (memory read — get Stm32Gpio::set address)
+  3. Call that address          (indirect branch)
+
+vs. non-virtual call:
+  1. Call Stm32Gpio::set()     (direct branch — address known at compile time)
+
+Cost: 2 extra memory reads + indirect branch ≈ ~5ns overhead
+</div></code></pre>
+<p>The vptr is why <code>memcpy</code> on polymorphic objects is dangerous — you'd copy the vptr, but if the destination has a different type, the vtable pointer is wrong and virtual calls jump to garbage addresses.</p>
+<h2 id="lifecycle-summary">Lifecycle summary</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Allocated when</th>
+<th>Data lives</th>
+<th>Freed when</th>
+<th>memcpy safe?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>int x</code></td>
+<td>function entry</td>
+<td>stack</td>
+<td>function return</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>int arr[100]</code></td>
+<td>function entry</td>
+<td>stack</td>
+<td>function return</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>struct Point p</code></td>
+<td>function entry</td>
+<td>stack</td>
+<td>function return</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>static int s</code></td>
+<td>program start</td>
+<td>.data/.bss</td>
+<td>program exit</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>const char* lit = &quot;hi&quot;</code></td>
+<td>compile time</td>
+<td>.rodata</td>
+<td>never (read-only)</td>
+<td>yes (pointer copy)</td>
+</tr>
+<tr>
+<td><code>std::string s</code></td>
+<td>constructor (stack+heap)</td>
+<td>stack + heap</td>
+<td>destructor frees heap</td>
+<td><strong>NO</strong> — double free</td>
+</tr>
+<tr>
+<td><code>std::vector&lt;T&gt; v</code></td>
+<td>constructor (stack+heap)</td>
+<td>stack + heap</td>
+<td>destructor frees heap</td>
+<td><strong>NO</strong> — double free</td>
+</tr>
+<tr>
+<td><code>std::unique_ptr&lt;T&gt;</code></td>
+<td>constructor (stack+heap)</td>
+<td>stack + heap</td>
+<td>destructor calls delete</td>
+<td><strong>NO</strong> — double free</td>
+</tr>
+<tr>
+<td><code>new Foo()</code></td>
+<td>explicit <code>new</code></td>
+<td>heap only</td>
+<td>explicit <code>delete</code></td>
+<td>depends on Foo</td>
+</tr>
+<tr>
+<td><code>new Stm32Gpio()</code> (virtual)</td>
+<td>explicit <code>new</code></td>
+<td>heap (with vptr)</td>
+<td><code>delete</code> (must have virtual dtor)</td>
+<td><strong>NO</strong> — vptr</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rules-of-thumb">Rules of thumb</h3>
+<ul>
+<li>Local variable → stack (automatic, fast, no leak possible)</li>
+<li>Global / <code>static</code> → .data or .bss (lives forever)</li>
+<li><code>new</code> / <code>malloc</code> → heap (manual or smart-pointer managed)</li>
+<li>String literals (<code>&quot;hello&quot;</code>) → .rodata (compiled in, read-only)</li>
+<li>vtables → .rodata (one per class, compiled in)</li>
+<li>Code → .text (compiled in, read-only, executable)</li>
+<li>If a type has a destructor → don't <code>memcpy</code>, use copy/move constructors</li>
+<li>In embedded (MCU) → avoid heap entirely, use static allocation (pattern #27)</li>
+</ul>
+<h1 id="c-build-pipeline">C++ build pipeline</h1>
+<p>Source Code          Stage 1          Stage 2          Stage 3          Stage 4
+.cpp      ──────► .i/ii   ──────► .s       ──────► .o       ──────► executable
+PREPROCESS       COMPILE          ASSEMBLE          LINK</p>
+<p>main.cpp    main.ii          main.s           main.o           cvd_controller
+(text)      (expanded text)  (assembly text)  (machine code)   (runnable binary)</p>
+<p>Stage 1: PREPROCESS — cpp (or g++ -E)</p>
+<pre><code>- #include parts of .cpp are expanded by including .h into .ii
+- CMake's target_include_directories becomes the -I flag
+- cpp -I src/common src/controller/main.cpp -o main.ii
+- g++ -E -I src/common src/controller/main.cpp -o main.ii
+</code></pre>
+<p>Stage 2: COMPILE — g++ -S</p>
+<pre><code>- g++ -S -std=c++17 -I src/common src/controller/main.cpp -o main.s
+</code></pre>
+<p>Stage 3: ASSEMBLE — g++ -c (or 'as')
+- g++ -c -std=c++17 -I src/common src/controller/main.cpp -o main.o</p>
+<p>Stage 4: LINK — g++ (calls ld internally)
+- g++ main.o -o main</p>
+<p>All at once
+- g++ -std=c++17 -I src/common src/controller/main.cpp -o main</p>
+<h2 id="2-compilation-details">2. Compilation details</h2>
+<ul>
+<li>Lexing &amp; Parser
+<ul>
+<li>Tokenize source → build Abstract Syntax Tree (AST)</li>
+<li>tree structure reveals the sequence for execution</li>
+</ul>
+</li>
+<li>Semantic analysis
+<ul>
+<li>type checking, access control</li>
+<li>Verify pkt.temperature is double, send() args match signature</li>
+</ul>
+</li>
+<li>Template instantiation
+<ul>
+<li>replace the <code>template &lt;typename T&gt;</code> arg</li>
+</ul>
+</li>
+<li>Overload resolution
+<ul>
+<li>std::cout &lt;&lt; pkt.temperature → pick operator&lt;&lt;(double)</li>
+</ul>
+</li>
+<li>Optimization (-O2)
+<ul>
+<li>Inline functions, eliminate dead code, unroll loops, vectorize</li>
+</ul>
+</li>
+<li>Register allocation
+<ul>
+<li>Map variables to CPU registers (rax, xmm0, etc.)</li>
+</ul>
+</li>
+<li>Instruction selection
+<ul>
+<li>Choose x86 instructions (movsd, addsd, subsd)</li>
+</ul>
+</li>
+<li>Struct layout
+<ul>
+<li>Compute field offsets: temperature is at byte 12 from struct start</li>
+</ul>
+</li>
+<li>Stack frame layout
+<ul>
+<li>Decide where each local variable lives relative to Register Stack Pointer</li>
+</ul>
+</li>
+</ul>
+<h3 id="inline-and-constexpr-and-inlining-compiler-decision">inline and constexpr and Inlining compiler decision</h3>
+<ul>
+<li><code>inline</code>, <code>constexpr</code>, <code>template</code> all produce weak symbols → all ODR-safe in headers
+<ul>
+<li>each .o carries a copy, linker keeps one, discards duplicates</li>
+</ul>
+</li>
+<li><code>constexpr</code> → implies <code>inline</code> (weak symbol) + CAN evaluate at compile time
+<ul>
+<li><code>constexpr int x = factorial(5);</code> → computed by compiler, no runtime call</li>
+<li>runtime args → falls back to normal (inlined) function call</li>
+</ul>
+</li>
+<li>Inlining (body expanded at call site, no <code>bl</code>) is a compiler optimization
+<ul>
+<li><code>-O2</code> inlines small fns automatically regardless of <code>inline</code> keyword</li>
+<li>too much inlining bloats code → cache misses → slower</li>
+<li><code>-O2</code> also folds obvious compile-time constants -&gt; obvious calculation</li>
+<li><code>volatile</code> enforce compiler to not fold</li>
+</ul>
+</li>
+</ul>
+<h3 id="const-mutable-volatile-atomic">const mutable volatile atomic</h3>
+<ul>
+<li><code>const</code> fns do not change the obj</li>
+<li><code>mutable</code> var of an obj can change under <code>const</code> fns
+<ul>
+<li>[TODO] caching, logging, counters, mutexes</li>
+</ul>
+</li>
+<li><code>volatile</code> Inform compiler this variable can change outside your view
+<ul>
+<li>memory-mapped HW registers</li>
+<li>signal modifying</li>
+</ul>
+</li>
+<li>std::atomic<T> adds thread-safe read/write + memory ordering to <code>volatile</code></li>
+<li>atomic is a single CPU instruction <code>dmb  ish</code> over the complex std::mutex
+<ul>
+<li>atomic is lock_free while mutex is not</li>
+<li>dmb  ish  drains all pending write before continue</li>
+</ul>
+</li>
+<li>atomic<BigStruct> falls back to mutex for speed</li>
+</ul>
+<h2 id="3-assemble-as">3. Assemble as</h2>
+<h2 id="4-link-ld">4. Link ld</h2>
+<ul>
+<li>Linker resolves compile-yielded symbols by name — it does not re-check types.</li>
+<li>ODR happens when 2 .o is compiled with version-diff shared.h</li>
+<li>.o (object file)
+<ul>
+<li>Symbols: unresolved (U = undefined)</li>
+<li>Not loadable at runtime</li>
+<li>Contains one .cpp's machine code</li>
+<li>Position-independent: not required</li>
+<li>Used by linker (ld) at build time</li>
+</ul>
+</li>
+<li>.so / .dylib (shared library)
+<ul>
+<li>Symbols: all resolved</li>
+<li>Loadable at runtime (dlopen / ctypes.CDLL)</li>
+<li>Contains linked, complete library</li>
+<li>Position-independent: yes, needs <code>-fPIC</code></li>
+<li>Used by OS loader at runtime</li>
+<li><code>extern &quot;C&quot;</code> required for Python/C interop (no mangling)</li>
+<li><code>g++ -std=c++17 -shared -fPIC pid_lib.cpp -o libpid.dylib</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="mangling-and-symbol">Mangling and symbol</h3>
+<ul>
+<li>One executable, one symbol</li>
+<li>Mangling distinguish the over loaded function name in C++
+_ZN3PID7computeEddd
+││ │   │      ││││
+││ │   │      │└─── d = double (paras)
+││ │   │      └──── E = end of nested name
+││ │   └──────────── 7compute = method name
+││ └──────────────── 3PID = class name
+│└────────────────── N = nested name start
+└─────────────────── _Z = C++ mangled</li>
+<li><code>extern &quot;C&quot; void handle_signal(int sig);</code> disable mangling so the symbol is <code>handle_signal</code> only</li>
+<li><code>nm main.o</code>
+<ul>
+<li><code>T</code> global function / <code>t</code> static (internal linkage) function</li>
+<li><code>b</code> static local data</li>
+<li><code>r</code> string literals and constants</li>
+<li><code>U</code> undefined — should be linked at link time</li>
+<li><code>W</code> weak symbols — inline, constexpr, template</li>
+</ul>
+</li>
+<li>weak symbols
+<ul>
+<li>inline functions are intrinsically weak</li>
+<li>compiler randomly keep one of the multiple conflicting weak symbols</li>
+</ul>
+</li>
+</ul>
+<h2 id="g-invoke-binaries">g++ invoke binaries</h2>
+<p>g++ -v -std=c++17 -I src/common src/controller/main.cpp -o main 2&gt;&amp;1
+Apple clang version 17.0.0 (clang-1700.6.3.2)
+Target: arm64-apple-darwin25.4.0
+Thread model: posix
+InstalledDir: /Library/Developer/CommandLineTools/usr/bin</p>
+<h2 id="-stdc17--posix--lib-c">-std=c++17 &amp; POSIX &amp; lib c</h2>
+<ul>
+<li>std flag specifies which path stds should be found</li>
+<li>POSIX libs are OS specific and can be checked by <code>g++ -###</code></li>
+<li>std:: (C++)
+<ul>
+<li>Defined by ISO C++ committee</li>
+<li>Name mangling: yes (<code>_ZSt5clamp...</code>)</li>
+<li>Namespace: <code>std::</code></li>
+<li>Templates/overloads: yes</li>
+<li>Talks to kernel: rarely</li>
+<li>Portable to Windows: yes (MSVC)</li>
+</ul>
+</li>
+<li>libc (C)
+<ul>
+<li>Defined by ISO C committee</li>
+<li>Name mangling: no (<code>memcpy</code>)</li>
+<li>Namespace: <code>std::</code> or global</li>
+<li>Templates/overloads: no</li>
+<li>Talks to kernel: sometimes (<code>malloc</code>)</li>
+<li>Portable to Windows: yes (MSVC)</li>
+</ul>
+</li>
+<li>POSIX
+<ul>
+<li>Defined by IEEE / Open Group</li>
+<li>Name mangling: no (<code>signal</code>)</li>
+<li>Namespace: global only</li>
+<li>Templates/overloads: no to support both C and C++</li>
+<li>Talks to kernel: almost always</li>
+<li>Portable to Windows: no</li>
+</ul>
+</li>
+</ul>
+<h2 id="struct-and-class">struct and class</h2>
+<ul>
+<li>Identical except struct is public by default and class is private</li>
+</ul>
+<h2 id="headers-file">Headers file</h2>
+<ul>
+<li><T> must be in .h as they are weak and unimplemented</li>
+<li>one .h for all .cpp can avoid ODR (One Definition Rule)
+<ul>
+<li>Bazel / CMake guarantees single header version so ODR is avoided</li>
+</ul>
+</li>
+</ul>
+<h3 id="unity-build">unity build</h3>
+<h3 id="__restrict">__restrict</h3>
+<ul>
+<li>these pointers do not reference one another during function call</li>
+<li>donot bl hence compiler friendly</li>
+</ul>
+<p>int		getaddrinfo(const char * __restrict, const char * __restrict,
+const struct addrinfo * __restrict,
+struct addrinfo ** __restrict);</p>
+
+</body>
+</html>

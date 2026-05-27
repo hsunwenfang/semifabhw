@@ -1,0 +1,1913 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>embeded-system-hw.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+<link rel="stylesheet" href="file:///Users/hsunwenfang/.vscode/md-pdf.css" type="text/css">
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="embedded-system-hardware">Embedded System Hardware</h1>
+<h2 id="0-memory-layout">0. Memory Layout</h2>
+<p>No-OS (bare-metal)              RTOS                           Full OS (Linux)
+─────────────────────           ─────────────────────          ─────────────────────
+┌──────────────────┐ HIGH      ┌──────────────────┐ HIGH     ┌──────────────────┐ HIGH
+│                  │           │                  │          │  Kernel space    │
+│  MSP stack       │ ←SP       │  MSP stack       │ (ISR+    │ (shared mapping) │
+│  (only stack)    │           │  (small, ~1KB)   │  kernel) ├──────────────────┤
+│  grows ↓         │           │  grows ↓         │          │Stack (per-thread)│ ←SP
+│                  │           ├──────────────────┤          │  grows ↓         │
+│                  │           │  Task A PSP      │          │                  │
+│                  │           │  (512B-4KB)      │          │  (free space)    │
+│                  │           ├──────────────────┤          │                  │
+│  (free space)    │           │  Task B PSP      │          │  Heap            │
+│                  │           │  (512B-4KB)      │          │  grows ↑         │
+│                  │           ├──────────────────┤          │  (malloc/new)    │
+│                  │           │  Task C PSP      │          ├──────────────────┤
+│  ← NO HEAP →     │           │  (512B-4KB)      │          │  .bss            │
+│                  │           ├──────────────────┤          │  .data           │
+├──────────────────┤           │  Heap (optional) │          │  .text (code)    │
+│  .bss            │           │  grows ↑         │          └──────────────────┘ LOW
+│  (state machine, │           │  (queues, alloc) │           Virtual per-process
+│   sensor bufs,   │           ├──────────────────┤           MMU-isolated
+│   error_count)   │           │  .bss            │
+├──────────────────┤           │  .data           │
+│  .data           │           ├──────────────────┤
+│  (calibration)   │           │  .text (code)    │
+├──────────────────┤           │  + RTOS kernel   │
+│  .text (code)    │           └──────────────────┘ LOW
+└──────────────────┘ LOW</p>
+<p>Key differences:
+No-OS:  1 stack (MSP), no heap, simple layout
+RTOS:   1 MSP + N PSPs, optional heap, stacks adjacent in RAM
+Full OS: virtual memory, per-process isolation, large heap</p>
+<h3 id="msp-main-stack-pointer-vs-psp-process-stack-pointer-dual-stack-pointers">MSP Main Stack Pointer vs PSP Process Stack Pointer (dual stack pointers)</h3>
+<ul>
+<li>stack pointer points to current top of the stack</li>
+<li>moves at every push/pop including function calls</li>
+<li>fn call move down the stack pointer while fn returns turn SP back up</li>
+<li>MSP is the return point if curr PSP corrupted</li>
+</ul>
+<pre class="hljs"><code><div>Bare metal (no RTOS):
+  Only MSP used — one stack for everything
+
+RTOS:
+  MSP = kernel + ISRs (shared, small)
+  PSP = per-task stack (each task gets its own)
+  Context switch = save PSP of old task, load PSP of new task
+</div></code></pre>
+<h3 id="stack-mechanics">Stack Mechanics</h3>
+<pre class="hljs"><code><div>Function call (BL instruction):
+  1. LR ← return address (PC + 4)
+  2. PC ← target function
+  3. Callee pushes {r4-r11, lr} onto stack (PUSH instruction)
+  4. SP decremented by frame size
+
+Stack grows DOWN on ARM (high address → low address):
+┌────────────┐ 0x20008000 (stack top / initial SP)
+│ main frame │
+│ func_a frame│
+│ func_b frame│ ← SP here during func_b
+│            │
+│   (free)   │
+└────────────┘ 0x20000000 (RAM start)
+</div></code></pre>
+<p>Stack overflow = SP goes below allocated region → corrupts heap/globals</p>
+<h3 id="memory-guards">Memory guards</h3>
+<ul>
+<li><strong>No-OS</strong>
+— MPU region (if configured), 32–256 bytes → protects .bss from MSP overflow</li>
+<li><strong>RTOS</strong>
+<ul>
+<li>MPU region, 32 bytes → protects task stacks from MSP overflow
+— MPU region per task, 32 bytes → protects Task B from Task A overflow
+— MPU region, 32 bytes → protects .bss/heap from bottom task overflow</li>
+</ul>
+</li>
+<li><strong>Full OS</strong>
+— Unmapped MMU page, 4 KB → protects adjacent memory from stack overflow
+— Unmapped MMU page, 4 KB → between heap allocations (ASAN)</li>
+</ul>
+<h2 id="1-compute--cpu--registers">1. Compute — CPU &amp; Registers</h2>
+<h3 id="arm-cortex-m-register-set">ARM Cortex-M Register Set</h3>
+<table>
+<thead>
+<tr>
+<th>Register</th>
+<th>Width</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>r0-r3</strong></td>
+<td>32-bit</td>
+<td>Function arguments / return value / caller-saved</td>
+</tr>
+<tr>
+<td><strong>r4-r11</strong></td>
+<td>32-bit</td>
+<td>General purpose / callee-saved</td>
+</tr>
+<tr>
+<td><strong>r12 (IP)</strong></td>
+<td>32-bit</td>
+<td>Intra-procedure scratch</td>
+</tr>
+<tr>
+<td><strong>SP (r13)</strong></td>
+<td>32-bit</td>
+<td>Stack pointer (MSP or PSP)</td>
+</tr>
+<tr>
+<td><strong>LR (r14)</strong></td>
+<td>32-bit</td>
+<td>Return address (or magic EXC_RETURN in ISR)</td>
+</tr>
+<tr>
+<td><strong>PC (r15)</strong></td>
+<td>32-bit</td>
+<td>Program counter — next instruction to execute</td>
+</tr>
+<tr>
+<td><strong>xPSR</strong></td>
+<td>32-bit</td>
+<td>Flags (N/Z/C/V), exception number, thumb bit</td>
+</tr>
+<tr>
+<td><strong>CONTROL</strong></td>
+<td>2-bit</td>
+<td>Privilege level (0=privileged) + stack select (MSP/PSP)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pipeline-fetch--decode--execute">Pipeline: Fetch → Decode → Execute</h3>
+<ul>
+<li>Fetch
+<ul>
+<li>fetch the instruction 0xF1000A05 using <code>Flash</code> address 0x08001000</li>
+</ul>
+</li>
+<li>Decode
+<ul>
+<li>translate 0xF1000A05 into real HW actions using CPU native logic</li>
+</ul>
+</li>
+<li>Execute
+<ul>
+<li>register, ALU executes</li>
+</ul>
+</li>
+</ul>
+<pre class="hljs"><code><div>Cortex-M4: 3-stage pipeline -&gt; improve over sequential
+
+Cycle:    1    2    3    4    5    6
+Fetch:   [A]  [B]  [C]  [D]  [E]  [F]
+Decode:       [A]  [B]  [C]  [D]  [E]
+Execute:           [A]  [B]  [C]  [D]
+
+Branch taken at C:
+Cycle:    1    2    3    4    5    6    7
+Fetch:   [A]  [B]  [C]  [X]  [X]  [T]  [U]  ← pipeline flush, refill
+Decode:       [A]  [B]  [C]  [--] [--] [T]
+Execute:           [A]  [B]  [C]       [--]  [T]
+
+Branch = 2-3 cycle penalty (pipeline flush + refill)
+This is why tight loops &gt;&gt; frequent branching on MCU
+</div></code></pre>
+<ul>
+<li>use predictable branching (for-loop) in MCU</li>
+</ul>
+<h3 id="bit-banding-cortex-m3m4">Bit-banding (Cortex-M3/M4)</h3>
+<pre class="hljs"><code><div>Problem: read-modify-write on a register bit is NOT atomic
+  LDR r0, [GPIOA_ODR]   ← read
+  ORR r0, r0, #(1&lt;&lt;5)   ← modify
+  STR r0, [GPIOA_ODR]   ← write  ← ISR can fire between read and write!
+
+Solution: bit-band region maps each BIT to a unique 32-bit ADDRESS
+  Writing 1 to that address sets ONLY that bit, atomically
+
+Bit-band alias address formula:
+  bit_alias = BITBAND_BASE + (byte_offset × 32) + (bit_number × 4)
+
+// Set GPIOA bit 5 atomically — single store instruction, no RMW race
+*(volatile uint32_t*)(0x42000000 + (0x20014 * 32) + (5 * 4)) = 1;
+</div></code></pre>
+<h3 id="memory-mapped-io">Memory-Mapped I/O</h3>
+<p><code>Flash</code> stores non-volatile data</p>
+<pre class="hljs"><code><div>Peripherals ARE memory addresses — same bus, same load/store instructions:
+
+Address range        | What lives there
+---------------------|-----------------------------
+0x00000000-0x07FFFFFF | Flash (code + const data)
+0x20000000-0x3FFFFFFF | SRAM (variables, stack, heap)
+0x40000000-0x5FFFFFFF | Peripherals (GPIO, UART, SPI, TIM, ADC...)
+0xE0000000-0xFFFFFFFF | System (NVIC, SysTick, SCB, MPU, debug)
+
+To control hardware = write to specific address:
+  *(volatile uint32_t*)0x40020014 = (1 &lt;&lt; 5);  // GPIOA pin 5 high
+
+volatile = compiler must read/write every time (no caching in register)
+reinterpret_cast = integer → pointer (different types, same bit pattern)
+</div></code></pre>
+<h3 id="bus-architecture-ahb--apb">Bus Architecture (AHB / APB)</h3>
+<p>Bus shares wires that carry address + data between CPU and peripherals</p>
+<p>┌─────┐    Address bus (32 wires): &quot;I want to talk to device at 0x08001000&quot;
+│ CPU │───────────────────────────────────────────────────
+│     │    Data bus (32 wires):    &quot;here's 4 bytes / give me 4 bytes&quot;
+│     │───────────────────────────────────────────────────
+│     │    Control signals:        &quot;READ&quot; or &quot;WRITE&quot;, size, ready
+└─────┘───────────────────────────────────────────────────
+│           │           │           │
+┌──┴──┐     ┌──┴──┐     ┌──┴──┐     ┌──┴──┐
+│Flash│     │SRAM │     │GPIO │     │UART │
+└─────┘     └─────┘     └─────┘     └─────┘</p>
+<p>Bus matrix (a hardware router built into the chip) looks at the top bits of the address
+Based on those bits, one chip-select line (HSEL) electric signal is sent to the device
+device responds on the data bus</p>
+<p>Fetch stage in full:</p>
+<ol>
+<li>PC = 0x08001000</li>
+<li>CPU puts 0x08001000 on the AHB address bus → &quot;READ&quot;</li>
+<li>Flash received HSEL signal outputs 0xF1000A05 on data bus</li>
+<li>CPU receives 0xF1000A05 → passes to Decode stage</li>
+<li>PC += 4 (ready for next fetch)</li>
+</ol>
+<h3 id="clock-tree">Clock Tree</h3>
+<p><code>HSE</code> Quartz crystal (8 MHz) / <code>HSI</code> RC circuit oscillator (16 MHz)
+→ <code>PLL</code> multiplies to 168 MHz <code>SYSCLK</code>
+→ <code>AHB</code> prescaler ÷1 = 168 MHz (CPU, SRAM, DMA)
+→ <code>APB2</code> prescaler ÷2 = 84 MHz (SPI1's bus clock)
+→ <code>RCC</code> clock gate enables SPI1 (RCC-&gt;APB2ENR |= SPI1EN)
+→ <code>SPI1</code> internal prescaler ÷8 = 10.5 MHz
+→ <code>SCLK</code> pin toggles at 10.5 MHz
+→ External <code>ADC</code> chip receives clock, sends data back on <code>MISO</code></p>
+<p>HSE/HSI → PLL → SYSCLK
+→ AHB (168MHz) for CPU core / SRAM / DMA / GPIO / Flash mem
+→ APB2 (84MHz) for fast peripherals (SPI1, USART1)
+→ APB1 (42MHz) for slow peripherals (USART2, I2C, SPI2)</p>
+<p><code>SPI</code> Serial Peripheral Interface has 4 wires</p>
+<ul>
+<li>MOSI : master out slave in</li>
+<li>MISO : master in slave out</li>
+<li>SCLK : Master procides clock</li>
+<li>CS : Master selects which slave</li>
+<li>MOSI and MISO shares shift register -&gt; <code>full duplex</code></li>
+</ul>
+<p>Wrong clock setup</p>
+<ul>
+<li>UART sends garbage → baud rate calculated from wrong SYSCLK</li>
+<li><code>SPI</code> too fast for slave → clock divider assumes wrong input frequency</li>
+<li>Timer interrupt at wrong rate → prescaler math uses wrong APB clock</li>
+</ul>
+<h3 id="power-modes-hardware-feature--used-by-no-os-and-rtos-not-full-os">Power Modes (hardware feature — used by No-OS and RTOS, not Full OS)</h3>
+<ul>
+<li><strong>Run</strong> — everything on, active processing</li>
+<li><strong>Sleep</strong> — CPU clock off, peripherals still running
+<ul>
+<li>Wake: any interrupt (~1µs wake time)</li>
+<li>No-OS: <code>__WFI()</code> in idle loop</li>
+<li>RTOS: idle task calls <code>__WFI()</code> automatically</li>
+<li>Semi: waiting for next ADC cycle</li>
+</ul>
+</li>
+<li><strong>Stop</strong> — all clocks off except LSI/LSE, voltage regulator low-power
+<ul>
+<li>Wake: EXTI pin change or RTC alarm (~5µs wake time)</li>
+<li>RTOS: tickless idle mode (<code>configUSE_TICKLESS_IDLE</code>)</li>
+<li>Semi: idle tool waiting for wafer to arrive</li>
+</ul>
+</li>
+<li><strong>Standby</strong> — everything off except backup domain, RAM contents LOST
+<ul>
+<li>Wake: WKUP pin or RTC (~50µs + full re-init, like a reboot)</li>
+<li>Semi: long idle, battery-backed sensor logging</li>
+</ul>
+</li>
+<li>Full OS (Linux) rarely uses these — always running GUI/comms, never idle long enough</li>
+<li>These are just register writes (<code>SCB-&gt;SCR</code> + <code>__WFI()</code>) — not OS features</li>
+</ul>
+<h3 id="fault-handlers">Fault Handlers</h3>
+<ul>
+<li><strong>HardFault</strong> - catch-all for unhandled faults
+<ul>
+<li>Typical bug: wild pointer points to garbage addr, stack overflow</li>
+</ul>
+</li>
+<li><strong>MemManage</strong> — MPU violation hits <code>mem guard</code>
+<ul>
+<li>Typical bug: task accessing another task's memory</li>
+</ul>
+</li>
+<li><strong>BusFault</strong> — invalid bus access
+<ul>
+<li>Typical bug: reading from disabled peripheral (clock gate off)
+Each peripheral has a clock gate bit in RCC registers needed enaablement
+<code>RCC-&gt;APB1ENR |= RCC_APB1ENR_USART2EN;</code>  // turn on USART2 clock</li>
+</ul>
+</li>
+<li><strong>UsageFault</strong> — undefined instruction, unaligned access
+<ul>
+<li>Typical bug: corrupted function pointer, wrong Thumb bit</li>
+</ul>
+</li>
+</ul>
+<p><code>CFSR</code> is a 32-bit register split into 3 sub-registers:</p>
+<ul>
+<li>Bits [7:0] = <code>MMFSR</code> (MemManage faults — which MPU violation)</li>
+<li>Bits [15:8] = <code>BFSR</code> (BusFault — which bus error)</li>
+<li>Bits [31:16] = <code>UFSR</code> (UsageFault — undefined instr, alignment, etc.)</li>
+</ul>
+<p><code>SCB</code> = System Control Block — a set of memory-mapped registers at 0xE000ED00 that control core CPU behavior</p>
+<pre class="hljs"><code><div><span class="hljs-comment">// Useful HardFault handler — reads stacked registers to find the culprit</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">HardFault_Handler</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-function">__asm <span class="hljs-title">volatile</span> <span class="hljs-params">(
+        <span class="hljs-string">&quot;tst lr, #4      \n&quot;</span>  <span class="hljs-comment">// check whether MSP or PSP is used</span>
+        <span class="hljs-string">&quot;ite eq           \n&quot;</span>
+        <span class="hljs-string">&quot;mrseq r0, msp   \n&quot;</span>  <span class="hljs-comment">// MSP if in handler mode</span>
+        <span class="hljs-string">&quot;mrsne r0, psp   \n&quot;</span>  <span class="hljs-comment">// PSP if in thread mode</span>
+        <span class="hljs-string">&quot;b fault_dump     \n&quot;</span>  <span class="hljs-comment">// pass stack frame pointer to C function</span>
+    )</span></span>;
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">fault_dump</span><span class="hljs-params">(<span class="hljs-type">uint32_t</span>* frame)</span> </span>{
+    <span class="hljs-comment">// frame[0]=r0, [1]=r1, [2]=r2, [3]=r3, [4]=r12, [5]=LR, [6]=PC, [7]=xPSR</span>
+    <span class="hljs-type">uint32_t</span> fault_pc = frame[<span class="hljs-number">6</span>];  <span class="hljs-comment">// THIS is the instruction that caused the fault</span>
+    <span class="hljs-type">uint32_t</span> cfsr = SCB-&gt;CFSR;     <span class="hljs-comment">// reads the fault</span>
+    <span class="hljs-comment">// Log to flash, blink LED, halt</span>
+}
+</div></code></pre>
+<h3 id="debug-interface">Debug Interface</h3>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Wires</th>
+<th>Speed</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SWD</strong></td>
+<td>2 (SWDIO + SWCLK)</td>
+<td>up to 4 MHz</td>
+<td>Standard debug for Cortex-M</td>
+</tr>
+<tr>
+<td><strong>JTAG</strong></td>
+<td>5 (TDI/TDO/TMS/TCK/TRST)</td>
+<td>up to 10 MHz</td>
+<td>Legacy, more pins, daisy-chain</td>
+</tr>
+<tr>
+<td><strong>ITM</strong></td>
+<td>Over SWD (no extra pins)</td>
+<td>~1 Mbps</td>
+<td>printf-style trace without UART</td>
+</tr>
+<tr>
+<td><strong>ETM</strong></td>
+<td>4+ trace pins</td>
+<td>Full speed</td>
+<td>Instruction trace ($$$ probes)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-interrupt-hardware-nvic">2. Interrupt Hardware (NVIC)</h2>
+<h3 id="how-an-interrupt-works--cpu-register-level">How an interrupt works — CPU register level</h3>
+<ul>
+<li>Use <code>volatile</code> for shared var to avoid optimize-away of compiler</li>
+</ul>
+<p>Normal execution:
+CPU fetches instructions at addresses pointed to by PC (Program Counter)
+PC: 0x1000 → 0x1004 → 0x1008 → 0x100C → ...</p>
+<p>Interrupt fires (e.g., UART byte received):</p>
+<ol>
+<li>Peripheral sets flag bit in its status register</li>
+<li>NVIC (Nested Vectored Interrupt Controller) sees the flag</li>
+<li>NVIC forces CPU to:
+a. Push registers (r0-r3, r12, LR, PC, xPSR) onto stack  ← context save
+b. Load PC from VECTOR TABLE at fixed address
+c. Execute the <code>ISR</code> interrupt service routine function</li>
+</ol>
+<pre class="hljs"><code><div>CPU registers BEFORE interrupt:
+┌──────────────┬──────────────┬────────┬──────────────┐
+│ PC=0x100C    │ SP=0x2000    │ r0=42  │ LR=0x0FF8    │
+└──────────────┴──────────────┴────────┴──────────────┘
+
+Stack AFTER hardware auto-push (~12 cycles, zero software):
+SP → ┌────────────┐ 0x1FE0
+     │ xPSR       │
+     │ PC=0x100C  │  ← return address (resume here after ISR)
+     │ LR=0x0FF8  │
+     │ r12        │
+     │ r3, r2, r1 │
+     │ r0=42      │
+     └────────────┘ 0x2000 (original SP)
+
+CPU registers DURING ISR:
+┌──────────────┬──────────────┬──────────────────────────────────┐
+│ PC=ISR_addr  │ SP=0x1FE0    │ LR=0xFFFFFFF9 (magic: &quot;return&quot;) │
+└──────────────┴──────────────┴──────────────────────────────────┘
+
+ISR returns (bx lr with magic value):
+  → CPU pops saved registers from stack
+  → PC restored to 0x100C → main code resumes exactly where it left off
+</div></code></pre>
+<h3 id="vector-table--the-hardware-function-pointer-array">Vector table — the hardware function pointer array</h3>
+<pre class="hljs"><code><div>Address 0x00000000 (flash start on Cortex-M):
+┌─────────────────────────────────┐
+│ 0x00: Initial SP value          │  ← loaded into SP at reset
+│ 0x04: Reset_Handler address     │  ← first instruction after power-on
+│ 0x08: NMI_Handler address       │
+│ 0x0C: HardFault_Handler address │
+│ ...                             │
+│ 0x6C: USART1_IRQHandler address │  ← your ISR function pointer
+│ 0x70: SPI1_IRQHandler address   │
+│ 0x74: TIM2_IRQHandler address   │
+└─────────────────────────────────┘
+
+This is literally a C array of function pointers at a fixed address.
+Hardware indexes into it by interrupt number. That's all a &quot;vector table&quot; is.
+</div></code></pre>
+<h3 id="nvic-registers">NVIC Registers</h3>
+<table>
+<thead>
+<tr>
+<th>Register</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ISER[n]</strong></td>
+<td>Interrupt Set-Enable — write 1 to enable</td>
+</tr>
+<tr>
+<td><strong>ICER[n]</strong></td>
+<td>Interrupt Clear-Enable — write 1 to disable</td>
+</tr>
+<tr>
+<td><strong>ISPR[n]</strong></td>
+<td>Interrupt Set-Pending — force pending (software trigger)</td>
+</tr>
+<tr>
+<td><strong>ICPR[n]</strong></td>
+<td>Interrupt Clear-Pending — clear pending flag</td>
+</tr>
+<tr>
+<td><strong>IPR[n]</strong></td>
+<td>Interrupt Priority — 0=highest, 255=lowest</td>
+</tr>
+<tr>
+<td><strong>IABR[n]</strong></td>
+<td>Interrupt Active Bit — read-only, 1 if currently executing</td>
+</tr>
+</tbody>
+</table>
+<h3 id="priority-grouping">Priority Grouping</h3>
+<pre class="hljs"><code><div>8 priority bits split into: [preemption priority | sub-priority]
+  - Preemption priority: higher prio ISR can interrupt lower prio ISR (nesting)
+  - Sub-priority: tie-breaker when two ISRs pend simultaneously
+
+Example: 4 bits preemption + 4 bits sub-priority (NVIC_PriorityGroup_4)
+  ISR_A: preempt=2, sub=0  → runs during ISR_B
+  ISR_B: preempt=5, sub=0  → interrupted by ISR_A
+  ISR_C: preempt=5, sub=1  → if both B and C pend, B wins (lower sub)
+</div></code></pre>
+<h3 id="tail-chaining-and-late-arriving">Tail-chaining and Late-arriving</h3>
+<pre class="hljs"><code><div>Without tail-chaining (wasteful):
+  ISR_A finishes → pop registers → push registers → ISR_B starts
+  Cost: 24 cycles of pointless stack work
+
+With tail-chaining (Cortex-M automatic):
+  ISR_A finishes → skip pop/push → immediately start ISR_B
+  Cost: 6 cycles (just redirect PC)
+
+Late-arriving:
+  During ISR_A's entry stacking, higher-priority ISR_B arrives
+  → Hardware redirects to ISR_B without completing ISR_A entry
+  → ISR_B runs first, then tail-chains to ISR_A
+</div></code></pre>
+<h3 id="callback--the-software-equivalent">Callback — the software equivalent</h3>
+<p>Everything in embedded is a <strong>function pointer</strong> — the difference is who calls it and when:</p>
+<pre class="hljs"><code><div>Vector table entry     = function pointer invoked by HARDWARE (CPU/NVIC)
+Callback               = function pointer invoked by SOFTWARE (your loop/dispatcher)
+vtable entry           = function pointer invoked by SOFTWARE (organized per class)
+Task function pointer  = function pointer invoked by SCHEDULER
+</div></code></pre>
+<pre class="hljs"><code><div><span class="hljs-comment">// Callback = function pointer stored for later invocation by SOFTWARE</span>
+<span class="hljs-keyword">using</span> Callback = <span class="hljs-built_in">void</span>(*)(<span class="hljs-type">float</span>);
+
+Callback on_temp_ready = <span class="hljs-literal">nullptr</span>;
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">register_callback</span><span class="hljs-params">(Callback cb)</span> </span>{ on_temp_ready = cb; }
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">sensor_poll</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-type">float</span> temp = <span class="hljs-built_in">read_adc</span>();
+    <span class="hljs-keyword">if</span> (on_temp_ready)       <span class="hljs-comment">// check not null</span>
+        <span class="hljs-built_in">on_temp_ready</span>(temp); <span class="hljs-comment">// indirect call — one memory read + branch</span>
+}
+</div></code></pre>
+<h3 id="hardware-interrupt-vs-software-callback">Hardware interrupt vs software callback</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Hardware interrupt</th>
+<th>Software callback</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who calls?</td>
+<td>CPU hardware (NVIC)</td>
+<td>Your code (loop, dispatcher)</td>
+</tr>
+<tr>
+<td>Address stored where?</td>
+<td>Vector table in flash</td>
+<td>Function pointer in RAM/struct</td>
+</tr>
+<tr>
+<td>When called?</td>
+<td>Hardware event (pin, timer, peripheral)</td>
+<td>Software condition (message received, timer elapsed)</td>
+</tr>
+<tr>
+<td>Context save?</td>
+<td>Automatic by CPU (push registers to stack)</td>
+<td>Normal function call (compiler manages stack frame)</td>
+</tr>
+<tr>
+<td>Can preempt?</td>
+<td>Yes — stops whatever CPU was doing</td>
+<td>No — waits until caller invokes it</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="3-communication-buses">3. Communication Buses</h2>
+<h3 id="uart--rs-232--rs-485">UART / RS-232 / RS-485</h3>
+<pre class="hljs"><code><div>UART = Universal Asynchronous Receiver/Transmitter
+
+  TX ──────────────────── RX    (point-to-point, 2 wires)
+  RX ──────────────────── TX
+
+  No clock wire — both sides must agree on BAUD RATE
+  Frame: [START][D0][D1]...[D7][PARITY?][STOP]
+
+  Common baud rates: 9600, 115200, 921600
+  Max reliable distance: ~15m (RS-232), ~1200m (RS-485 differential)
+</div></code></pre>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Voltage</th>
+<th>Topology</th>
+<th>Distance</th>
+<th>Semi use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UART (TTL)</td>
+<td>0/3.3V</td>
+<td>Point-to-point</td>
+<td>&lt;1m (board-to-board)</td>
+<td>MCU debug, inter-chip</td>
+</tr>
+<tr>
+<td>RS-232</td>
+<td>±12V</td>
+<td>Point-to-point</td>
+<td>&lt;15m</td>
+<td>Legacy tool-to-host</td>
+</tr>
+<tr>
+<td>RS-485</td>
+<td>Differential ±5V</td>
+<td>Multi-drop bus (32+ nodes)</td>
+<td>&lt;1200m</td>
+<td>MFC daisy-chain, gas panels</td>
+</tr>
+</tbody>
+</table>
+<pre class="hljs"><code><div><span class="hljs-comment">// UART register-level init (STM32)</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">uart_init</span><span class="hljs-params">(<span class="hljs-type">uint32_t</span> baud)</span> </span>{
+    RCC-&gt;APB1ENR |= RCC_APB1ENR_USART2EN;        <span class="hljs-comment">// clock gate on</span>
+    USART2-&gt;BRR = SystemCoreClock / baud;          <span class="hljs-comment">// baud rate divider</span>
+    USART2-&gt;CR1 = USART_CR1_TE | USART_CR1_RE    <span class="hljs-comment">// enable TX + RX</span>
+                | USART_CR1_RXNEIE               <span class="hljs-comment">// RX interrupt enable</span>
+                | USART_CR1_UE;                  <span class="hljs-comment">// UART enable</span>
+    <span class="hljs-built_in">NVIC_EnableIRQ</span>(USART2_IRQn);                  <span class="hljs-comment">// enable in NVIC</span>
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">USART2_IRQHandler</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">if</span> (USART2-&gt;SR &amp; USART_SR_RXNE) {
+        <span class="hljs-type">uint8_t</span> byte = USART2-&gt;DR;  <span class="hljs-comment">// read clears RXNE flag</span>
+        rx_ring.<span class="hljs-built_in">push</span>(byte);
+    }
+}
+</div></code></pre>
+<h3 id="spi-serial-peripheral-interface">SPI (Serial Peripheral Interface)</h3>
+<pre class="hljs"><code><div>Master-slave, synchronous, full-duplex:
+
+        Master                      Slave
+    ┌───────────┐               ┌───────────┐
+    │   MOSI ───┼───────────────┼→ MOSI     │  (Master Out Slave In)
+    │   MISO ←──┼───────────────┼── MISO    │  (Master In Slave Out)
+    │   SCLK ───┼───────────────┼→ SCLK     │  (Clock — master drives)
+    │   CS   ───┼───────────────┼→ CS       │  (Chip Select — active low)
+    └───────────┘               └───────────┘
+
+- Master drives clock → no baud rate agreement needed
+- Full duplex: sends and receives simultaneously (shift register)
+- No addressing: CS pin selects which slave is active
+- Speeds: typically 1-50 MHz (much faster than I2C/UART)
+- Multiple slaves: one CS pin per slave, only one active at a time
+</div></code></pre>
+<table>
+<thead>
+<tr>
+<th>Clock Mode</th>
+<th>CPOL</th>
+<th>CPHA</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mode 0</td>
+<td>0</td>
+<td>0</td>
+<td>Clock idle low, sample on rising edge</td>
+</tr>
+<tr>
+<td>Mode 1</td>
+<td>0</td>
+<td>1</td>
+<td>Clock idle low, sample on falling edge</td>
+</tr>
+<tr>
+<td>Mode 2</td>
+<td>1</td>
+<td>0</td>
+<td>Clock idle high, sample on falling edge</td>
+</tr>
+<tr>
+<td>Mode 3</td>
+<td>1</td>
+<td>1</td>
+<td>Clock idle high, sample on rising edge</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Semi use:</strong> ADC reading (16-bit at 1 MHz = 16µs per sample), DAC output, FPGA communication, flash memory (recipe/log storage)</p>
+<pre class="hljs"><code><div><span class="hljs-comment">// SPI transaction pattern</span>
+<span class="hljs-function"><span class="hljs-type">uint16_t</span> <span class="hljs-title">spi_read_adc</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-built_in">CS_LOW</span>();                          <span class="hljs-comment">// select slave</span>
+    <span class="hljs-type">uint8_t</span> hi = <span class="hljs-built_in">spi_transfer</span>(<span class="hljs-number">0x00</span>);   <span class="hljs-comment">// clock out dummy, clock in data</span>
+    <span class="hljs-type">uint8_t</span> lo = <span class="hljs-built_in">spi_transfer</span>(<span class="hljs-number">0x00</span>);
+    <span class="hljs-built_in">CS_HIGH</span>();                         <span class="hljs-comment">// deselect</span>
+    <span class="hljs-keyword">return</span> (hi &lt;&lt; <span class="hljs-number">8</span>) | lo;
+}
+</div></code></pre>
+<h3 id="i2c-inter-integrated-circuit">I2C (Inter-Integrated Circuit)</h3>
+<pre class="hljs"><code><div>Multi-device bus, 2 wires with pull-up resistors:
+
+  VCC──┐──────────┐
+      [R]        [R]   (pull-ups: 4.7kΩ typical)
+       │          │
+  SDA ─┴──┬──┬──┬┴──  (data — bidirectional, open-drain)
+  SCL ────┬──┬──┬───  (clock — master drives)
+           │  │  │
+         [M] [S1][S2]  (master + multiple slaves on same 2 wires)
+
+- Each slave has a 7-bit address (set by hardware pins or fixed)
+- Master initiates all communication (slave can't talk unprompted)
+- ACK/NACK after every byte (slave pulls SDA low = ACK)
+- Bus speed: 100 kHz (standard), 400 kHz (fast), 1 MHz (fast+)
+</div></code></pre>
+<p><strong>I2C transaction protocol:</strong></p>
+<pre class="hljs"><code><div>START → [7-bit addr + R/W bit] → ACK → [data byte] → ACK → ... → STOP
+
+Write to slave 0x48:  S | 0x48&lt;&lt;1|0 | ACK | reg_addr | ACK | data | ACK | P
+Read from slave 0x48: S | 0x48&lt;&lt;1|0 | ACK | reg_addr | ACK | Sr | 0x48&lt;&lt;1|1 | ACK | data | NACK | P
+
+S = Start condition (SDA falls while SCL high)
+P = Stop condition (SDA rises while SCL high)
+Sr = Repeated start (avoids releasing bus between write and read)
+</div></code></pre>
+<p><strong>Bus recovery (9-clock trick):</strong></p>
+<pre class="hljs"><code><div>Problem: slave stuck holding SDA low (crashed mid-byte, won't release)
+Solution: master clocks SCL 9 times — slave will eventually release SDA after
+          it thinks it has sent all remaining bits
+Then: master issues STOP condition to reset bus state
+</div></code></pre>
+<p><strong>Semi use:</strong> Temperature sensors (LM75, TMP117), EEPROMs (AT24C), humidity sensors, small displays (OLED)</p>
+<h3 id="can-controller-area-network">CAN (Controller Area Network)</h3>
+<pre class="hljs"><code><div>Broadcast bus, differential pair, hardware arbitration:
+
+  CAN_H ─────┬──────┬──────┬──────┐
+  CAN_L ─────┬──────┬──────┬──────┐
+              │      │      │      │
+          [Node A][Node B][Node C][120Ω]  ← termination resistors at both ends
+
+- Message-based (not address-based): any node can send any message ID
+- All nodes see all messages — filter in hardware by ID
+- Priority: lowest message ID wins bus arbitration (bit-dominant = 0)
+  ID 0x100 beats ID 0x200 automatically, no collision
+</div></code></pre>
+<p><strong>CAN frame:</strong></p>
+<pre class="hljs"><code><div>┌─────┬──────────┬─────┬────────────────────┬─────┬─────┬───┐
+│ SOF │ ID (11b) │ RTR │ Data (0-8 bytes)    │ CRC │ ACK │EOF│
+└─────┴──────────┴─────┴────────────────────┴─────┴─────┴───┘
+
+- SOF: Start of Frame (dominant bit)
+- ID: Message identifier (11-bit standard, 29-bit extended)
+- RTR: Remote Transmission Request (request data from another node)
+- CRC: 15-bit CRC computed by hardware
+- ACK: All receivers acknowledge (pull bus dominant)
+</div></code></pre>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>CAN 2.0</th>
+<th>CAN-FD</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Data length</td>
+<td>0-8 bytes</td>
+<td>0-64 bytes</td>
+</tr>
+<tr>
+<td>Data rate</td>
+<td>up to 1 Mbps</td>
+<td>up to 8 Mbps (data phase)</td>
+</tr>
+<tr>
+<td>Arbitration</td>
+<td>11/29-bit ID</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Semi use</td>
+<td>Motor control, valve control</td>
+<td>High-speed sensor data</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Semi use:</strong> Multi-axis motor controllers, gas panel valve sequencing, smaller tools without Ethernet</p>
+<h3 id="usb-universal-serial-bus">USB (Universal Serial Bus)</h3>
+<pre class="hljs"><code><div>Host-device topology (NOT peer-to-peer):
+
+    Host (PC / Equipment Controller)
+       │
+    ┌──┴──┐
+    │ Hub │ (optional)
+    ├─────┤
+    │     │
+  [Dev1] [Dev2]
+
+- Complex enumeration protocol (device descriptors, configuration, endpoints)
+- Endpoint types: Control (setup), Bulk (data transfer), Interrupt (periodic), Isochronous (streaming)
+- Requires USB stack software (dozens of KB) — rarely bare-metal on small MCU
+- Middleware: TinyUSB, STM32 USB library, libusb
+</div></code></pre>
+<table>
+<thead>
+<tr>
+<th>Speed</th>
+<th>Rate</th>
+<th>Semi use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Low Speed</td>
+<td>1.5 Mbps</td>
+<td>HID (keyboard/mouse)</td>
+</tr>
+<tr>
+<td>Full Speed</td>
+<td>12 Mbps</td>
+<td>Simple CDC (virtual COM port)</td>
+</tr>
+<tr>
+<td>High Speed</td>
+<td>480 Mbps</td>
+<td>Data download, firmware update</td>
+</tr>
+<tr>
+<td>SuperSpeed</td>
+<td>5 Gbps</td>
+<td>High-speed cameras, bulk data</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Semi use:</strong> Equipment Controller ↔ PC data transfer, firmware update via DFU, virtual COM port for debug</p>
+<h3 id="ethercat-ethernet-for-control-automation-technology">EtherCAT (Ethernet for Control Automation Technology)</h3>
+<pre class="hljs"><code><div>Daisy-chain topology, deterministic, &quot;processing on the fly&quot;:
+
+  Master → [Slave 1] → [Slave 2] → [Slave 3] → ... → back to Master
+              ↕             ↕             ↕
+           [Drive]       [I/O]        [Sensor]
+
+- Standard Ethernet frame passes through each slave
+- Each slave reads/writes its slice of the frame as it passes through (~100ns per node)
+- Total cycle time: &lt;100µs for 100+ nodes
+- Jitter: &lt;1µs
+- Uses standard Ethernet PHY hardware — no special cables
+</div></code></pre>
+<p><strong>Semi use:</strong> ASML wafer stage (synchronized multi-axis motion at nm precision), high-speed motion control, real-time I/O</p>
+<h3 id="analog-io-adc--dac">Analog I/O (ADC / DAC)</h3>
+<pre class="hljs"><code><div>ADC (Analog to Digital Converter):
+  Physical voltage → integer number
+  
+  Resolution: 12-bit → 4096 steps (STM32), 16-bit → 65536 steps (external)
+  Reference: 3.3V → 1 LSB = 3.3V/4096 = 0.8mV
+  Sampling rate: 1 MSPS (STM32 fast), 100 kSPS (precision external)
+  
+  Input → [S/H] → [SAR/Sigma-Delta] → digital value
+         sample     conversion
+
+DAC (Digital to Analog Converter):
+  Integer number → physical voltage (setpoint output)
+  
+  Resolution: 12-bit typical
+  Settling time: 1-10µs (how fast output reaches new value)
+  Use: heater setpoint, valve position, analog control signals
+</div></code></pre>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Thermocouple (Type K)</th>
+<th>Pressure (Baratron)</th>
+<th>Flow (MFC)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Signal type</td>
+<td>~40µV/°C (needs amplifier)</td>
+<td>0-10V analog</td>
+<td>0-5V analog or RS-485 digital</td>
+</tr>
+<tr>
+<td>ADC bits needed</td>
+<td>16+ (low signal)</td>
+<td>12-16</td>
+<td>12</td>
+</tr>
+<tr>
+<td>Read rate</td>
+<td>10-100 Hz</td>
+<td>100-1000 Hz</td>
+<td>10-100 Hz</td>
+</tr>
+<tr>
+<td>Interface</td>
+<td>SPI (external ADC)</td>
+<td>ADC or I2C</td>
+<td>RS-485 / analog</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dma-direct-memory-access">DMA (Direct Memory Access)</h3>
+<pre class="hljs"><code><div>CPU configures DMA, then DMA moves data WITHOUT CPU involvement:
+
+Without DMA (CPU polling):
+  CPU: read byte → store to buffer → read byte → store → ... (100% CPU busy)
+
+With DMA:
+  CPU: configure(src=UART_DR, dst=buffer, count=256, trigger=RXNE)
+  DMA: [moves bytes automatically as they arrive]
+  CPU: [free to do other work]
+  DMA: [fires interrupt when transfer complete]
+  CPU: [processes full buffer]
+
+DMA channels/streams connect peripherals to memory:
+┌─────────┐     ┌─────────┐     ┌─────────┐
+│ UART DR │────→│  DMA    │────→│  SRAM   │  (peripheral → memory)
+│ ADC  DR │────→│ Engine  │────→│ buffer  │
+│ SPI  DR │←───→│         │←───→│         │  (bidirectional)
+└─────────┘     └─────────┘     └─────────┘
+</div></code></pre>
+<p><strong>DMA modes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+<th>Semi use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Peripheral → Memory</td>
+<td>Read peripheral data register into RAM buffer</td>
+<td>UART RX, ADC sampling</td>
+</tr>
+<tr>
+<td>Memory → Peripheral</td>
+<td>Write RAM buffer to peripheral</td>
+<td>UART TX, DAC output</td>
+</tr>
+<tr>
+<td>Memory → Memory</td>
+<td>Copy between RAM regions</td>
+<td>Buffer management</td>
+</tr>
+<tr>
+<td>Circular</td>
+<td>Auto-restart when count reaches zero</td>
+<td>Continuous ADC streaming</td>
+</tr>
+<tr>
+<td>Double-buffer</td>
+<td>Alternate between two buffers</td>
+<td>Zero-copy processing</td>
+</tr>
+</tbody>
+</table>
+<h3 id="bus-comparison-table">Bus Comparison Table</h3>
+<table>
+<thead>
+<tr>
+<th>Bus</th>
+<th>Wires</th>
+<th>Speed</th>
+<th>Topology</th>
+<th>Addressing</th>
+<th>Error detection</th>
+<th>Semi use case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UART</td>
+<td>2 (TX/RX)</td>
+<td>115k-1M baud</td>
+<td>Point-to-point</td>
+<td>None</td>
+<td>Parity (weak)</td>
+<td>Debug, legacy comms</td>
+</tr>
+<tr>
+<td>RS-485</td>
+<td>2 (A/B)</td>
+<td>up to 10 Mbps</td>
+<td>Multi-drop bus</td>
+<td>Software protocol</td>
+<td>CRC in protocol</td>
+<td>MFC daisy-chain</td>
+</tr>
+<tr>
+<td>SPI</td>
+<td>4+CS</td>
+<td>10-50 MHz</td>
+<td>Star (1 master)</td>
+<td>CS pin selects</td>
+<td>None (add CRC)</td>
+<td>ADC, DAC, FPGA</td>
+</tr>
+<tr>
+<td>I2C</td>
+<td>2 (SDA/SCL)</td>
+<td>100k-1MHz</td>
+<td>Multi-master bus</td>
+<td>7-bit hardware</td>
+<td>ACK/NACK</td>
+<td>Sensors, EEPROM</td>
+</tr>
+<tr>
+<td>CAN</td>
+<td>2 (H/L)</td>
+<td>1 Mbps / 8 Mbps FD</td>
+<td>Broadcast bus</td>
+<td>Message ID</td>
+<td>Hardware CRC + ACK</td>
+<td>Motor control</td>
+</tr>
+<tr>
+<td>USB</td>
+<td>4 (D+/D-/V/G)</td>
+<td>12-480 Mbps</td>
+<td>Tree (host-device)</td>
+<td>Endpoint</td>
+<td>Hardware CRC</td>
+<td>PC connection</td>
+</tr>
+<tr>
+<td>EtherCAT</td>
+<td>2 (Ethernet)</td>
+<td>100 Mbps</td>
+<td>Daisy-chain</td>
+<td>Position in chain</td>
+<td>Ethernet FCS</td>
+<td>Precision motion</td>
+</tr>
+</tbody>
+</table>
+<h3 id="choosing-a-bus-for-semi-equipment">Choosing a bus for semi equipment</h3>
+<pre class="hljs"><code><div>Decision tree:
+                        Need &gt;1 Mbps?
+                       /              \
+                     YES               NO
+                    /                    \
+          Need determinism?          How many devices?
+           /          \               /          \
+         YES          NO            1-2          3+
+          │            │             │            │
+       EtherCAT      USB/Eth       UART       I2C or CAN
+          │                          │            │
+    (motion ctrl)              (debug,         (sensors,
+                                host link)     motor ctrl)
+                    
+    Need speed + no addressing? → SPI (ADC/DAC, FPGA)
+    Need long distance? → RS-485
+    Need broadcast + priority? → CAN
+</div></code></pre>
+<hr>
+<h2 id="4-system-layer--no-os-vs-rtos-vs-full-os">4. System Layer — No-OS vs RTOS vs Full OS</h2>
+<h3 id="bare-metal-no-os">Bare Metal (No-OS)</h3>
+<pre class="hljs"><code><div>main() {
+    init_hardware();
+    while (1) {
+        task_a();  // always runs, no OS, no scheduler
+        task_b();  // just a function call
+        task_c();
+    }
+}
+
+Memory footprint: 0 bytes for &quot;OS&quot; — all RAM available for your code
+Context switch: none (no task stacks)
+Scheduling: implicit (order of function calls in loop)
+Interrupt: hardware ISR → set flag → main loop checks flag
+</div></code></pre>
+<p><strong>Variants:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>How it works</th>
+<th>Limitation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Super-loop</td>
+<td>while(1) { do everything }</td>
+<td>Fastest task dictates cycle time</td>
+</tr>
+<tr>
+<td>ISR + flags</td>
+<td>ISR sets volatile flag, main loop polls</td>
+<td>Still no preemption</td>
+</tr>
+<tr>
+<td>Cooperative scheduler</td>
+<td>Timer tick + task table with periods</td>
+<td>Tasks must not block</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Semi use:</strong> Individual sensor MCUs — thermocouple ADC, pressure gauge, single-axis motor. Response time &lt;10µs, single responsibility.</p>
+<h3 id="rtos-real-time-operating-system">RTOS (Real-Time Operating System)</h3>
+<pre class="hljs"><code><div>┌──────────────────────────────────────────┐
+│ RTOS Kernel                               │
+├──────────┬──────────┬──────────┬─────────┤
+│ Task A   │ Task B   │ Task C   │ Idle    │
+│ Stack A  │ Stack B  │ Stack C  │ Stack   │
+│ Prio: 3  │ Prio: 2  │ Prio: 1  │ Prio: 0│
+└──────────┴──────────┴──────────┴─────────┘
+
+Kernel tick ISR (SysTick, every 1ms):
+  1. Check if higher-priority task is now ready
+  2. If yes → context switch:
+     - Save current task registers to its stack (PSP)
+     - Load new task registers from its stack (PSP)
+     - Return from ISR into new task
+  3. If no → return to same task
+</div></code></pre>
+<p><strong>Context switch cost:</strong> ~10µs on Cortex-M4 at 168 MHz (save/restore ~32 registers)</p>
+<p><strong>Key primitives:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Primitive</th>
+<th>Purpose</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Task</strong></td>
+<td>Independent thread with own stack + priority</td>
+<td>Each subsystem = 1 task</td>
+</tr>
+<tr>
+<td><strong>Mutex</strong></td>
+<td>Mutual exclusion (one owner at a time)</td>
+<td>Protect shared hardware (SPI bus)</td>
+</tr>
+<tr>
+<td><strong>Semaphore</strong></td>
+<td>Counting signal (producer/consumer)</td>
+<td>ISR signals task &quot;data ready&quot;</td>
+</tr>
+<tr>
+<td><strong>Queue</strong></td>
+<td>Thread-safe FIFO between tasks</td>
+<td>Sensor data → control task</td>
+</tr>
+<tr>
+<td><strong>Event flags</strong></td>
+<td>Bitfield of conditions (wait for any/all)</td>
+<td>Multiple ready signals</td>
+</tr>
+<tr>
+<td><strong>Timer</strong></td>
+<td>Software timer (calls callback after delay)</td>
+<td>Timeout, periodic actions</td>
+</tr>
+</tbody>
+</table>
+<p><strong>RTOS vendors in semiconductor:</strong></p>
+<table>
+<thead>
+<tr>
+<th>RTOS</th>
+<th>License</th>
+<th>Used by</th>
+<th>Strengths</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VxWorks</td>
+<td>Commercial ($$$)</td>
+<td>Applied Materials, TEL</td>
+<td>Certified (DO-178C), mature</td>
+</tr>
+<tr>
+<td>QNX</td>
+<td>Commercial</td>
+<td>Lam Research</td>
+<td>Microkernel, fault isolation</td>
+</tr>
+<tr>
+<td>FreeRTOS</td>
+<td>MIT (free)</td>
+<td>New designs, prototypes</td>
+<td>Simple, huge community</td>
+</tr>
+<tr>
+<td>Zephyr</td>
+<td>Apache 2.0</td>
+<td>Emerging</td>
+<td>Modern, device tree, upstream drivers</td>
+</tr>
+<tr>
+<td>RT-Linux</td>
+<td>GPL</td>
+<td>ASML</td>
+<td>Linux ecosystem + RT patch</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Semi use:</strong> Chamber controller — manages heater PID, pressure control, gas sequencing, safety interlocks, host communication as separate tasks with priorities.</p>
+<h3 id="rtos-tasks-vs-os-processes">RTOS Tasks vs OS Processes</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>RTOS Task</th>
+<th>OS Process</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Address space</strong></td>
+<td><strong>Shared</strong> — all tasks see all RAM (flat memory, no MMU)</td>
+<td><strong>Isolated</strong> — each process has its own virtual address space (MMU enforced)</td>
+</tr>
+<tr>
+<td><strong>Protection</strong></td>
+<td>None by default (optional MPU = coarse, 8 regions)</td>
+<td>Full (MMU = fine-grained page-level isolation)</td>
+</tr>
+<tr>
+<td><strong>Stack</strong></td>
+<td>PSP per task, but heap/globals are shared</td>
+<td>Completely separate stack, heap, globals</td>
+</tr>
+<tr>
+<td><strong>Context switch cost</strong></td>
+<td>~10µs (save/restore registers only)</td>
+<td>~50-100µs (flush TLB, switch page tables, cache effects)</td>
+</tr>
+<tr>
+<td><strong>Creation cost</strong></td>
+<td>Statically allocated at boot (no <code>fork</code>)</td>
+<td><code>fork()</code>/<code>exec()</code> — copies page tables, allocates PID</td>
+</tr>
+<tr>
+<td><strong>Crash isolation</strong></td>
+<td>Task corrupts shared RAM → all tasks affected</td>
+<td>Process segfaults → only that process dies</td>
+</tr>
+<tr>
+<td><strong>Scheduling</strong></td>
+<td><strong>Deterministic</strong> — highest priority always runs, guaranteed within µs</td>
+<td><strong>Best-effort</strong> — CFS/priority can be preempted by kernel, no hard guarantees</td>
+</tr>
+<tr>
+<td><strong>System calls</strong></td>
+<td>Direct function call (same privilege level, no mode switch)</td>
+<td>Trap to kernel (user→kernel mode switch, ~1µs overhead)</td>
+</tr>
+<tr>
+<td><strong>Memory footprint</strong></td>
+<td>~512B–4KB per task (just the stack)</td>
+<td>~4MB+ virtual space per process (page tables, heap, libs)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The key difference — no MMU on Cortex-M:</strong></p>
+<pre class="hljs"><code><div>Regular OS (Linux/Windows):
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ Process A   │  │ Process B   │  │ Process C   │
+│ Virtual     │  │ Virtual     │  │ Virtual     │
+│ 0x0-0xFFFF  │  │ 0x0-0xFFFF  │  │ 0x0-0xFFFF  │ ← each thinks it has all memory
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │ MMU            │ MMU            │ MMU
+       ▼                ▼                ▼
+┌──────────────────────────────────────────────────┐
+│     Physical RAM (mapped differently per process) │
+└──────────────────────────────────────────────────┘
+
+RTOS (Cortex-M, no MMU):
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ Task A      │  │ Task B      │  │ Task C      │
+│ PSP stack A │  │ PSP stack B │  │ PSP stack C │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                │                │
+       ▼                ▼                ▼
+┌──────────────────────────────────────────────────┐
+│     Physical RAM (ALL tasks see SAME addresses)   │
+│     Task A can write to Task B's stack — no HW   │
+│     protection unless MPU is configured           │
+└──────────────────────────────────────────────────┘
+</div></code></pre>
+<p><strong>Why not just use Linux on everything?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Linux process</th>
+<th>RTOS task</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Respond within 10µs guaranteed</td>
+<td>Cannot guarantee</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Run on 64KB RAM MCU</td>
+<td>Impossible (needs ~8MB+)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Deterministic worst-case timing</td>
+<td>No (kernel can delay)</td>
+<td>Yes (priority preemption is immediate)</td>
+</tr>
+<tr>
+<td>Cost per unit (BOM)</td>
+<td>$5+ SoC with MMU</td>
+<td>$2 Cortex-M with no MMU</td>
+</tr>
+</tbody>
+</table>
+<p>If you use <strong>RT-Linux</strong> (PREEMPT_RT) on a Cortex-A with MMU, you get processes with isolation AND ~50µs real-time. That's what ASML uses for upper layers. But on a $2 Cortex-M chip controlling a heater PID loop at 10kHz — tasks are just function pointers with separate stacks, scheduled by a tiny kernel (~5KB).</p>
+<h3 id="full-os-linux--windows">Full OS (Linux / Windows)</h3>
+<pre class="hljs"><code><div>┌─────────────────────────────────────────────────┐
+│  User space                                      │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐          │
+│  │Recipe│ │ GUI  │ │Logger│ │SECS/ │          │
+│  │Engine│ │(Qt)  │ │      │ │GEM   │          │
+│  └──┬───┘ └──┬───┘ └──┬───┘ └──┬───┘          │
+├─────┼────────┼────────┼────────┼────────────────┤
+│  Kernel space                                    │
+│  ┌──────────────────────────────────────────┐   │
+│  │ Scheduler │ VFS │ Network │ Drivers      │   │
+│  └──────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────┤
+│  Hardware (x86/ARM via HAL)                      │
+└─────────────────────────────────────────────────┘
+
+- Virtual memory (MMU): each process thinks it has all RAM
+- Preemptive multitasking: kernel can interrupt any process
+- File systems: ext4, NTFS — recipe storage, data logging
+- Network stack: full TCP/IP, HTTP, SSH
+- Not real-time by default (scheduling latency: 1-10ms)
+  - PREEMPT_RT patch: reduces worst case to ~50µs (still not as good as RTOS)
+</div></code></pre>
+<p><strong>Semi use:</strong> Equipment Controller — recipe engine, operator GUI, SECS/GEM factory communication, data collection. Connects DOWN to RTOS via Ethernet/PCIe/shared memory.</p>
+<h3 id="decision-matrix">Decision Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Criteria</th>
+<th>No-OS</th>
+<th>RTOS</th>
+<th>Full OS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Tasks</strong></td>
+<td>1-3</td>
+<td>4-20+</td>
+<td>Unlimited</td>
+</tr>
+<tr>
+<td><strong>Deadline</strong></td>
+<td>Hardest (&lt;10µs)</td>
+<td>Hard (100µs-10ms)</td>
+<td>Soft (&gt;10ms)</td>
+</tr>
+<tr>
+<td><strong>RAM</strong></td>
+<td>&lt;64KB</td>
+<td>64KB-1MB</td>
+<td>&gt;1MB</td>
+</tr>
+<tr>
+<td><strong>Flash</strong></td>
+<td>&lt;256KB</td>
+<td>256KB-2MB</td>
+<td>&gt;4MB</td>
+</tr>
+<tr>
+<td><strong>Needs file system?</strong></td>
+<td>No</td>
+<td>Maybe (FatFS)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Needs TCP/IP?</strong></td>
+<td>No</td>
+<td>Lightweight (lwIP)</td>
+<td>Full stack</td>
+</tr>
+<tr>
+<td><strong>Needs GUI?</strong></td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Code complexity</strong></td>
+<td>Low</td>
+<td>Medium</td>
+<td>High</td>
+</tr>
+<tr>
+<td><strong>Determinism</strong></td>
+<td>Highest</td>
+<td>High</td>
+<td>Low (without RT patch)</td>
+</tr>
+<tr>
+<td><strong>Failure isolation</strong></td>
+<td>None (one crash = all crash)</td>
+<td>Per-task (MPU)</td>
+<td>Per-process (MMU)</td>
+</tr>
+<tr>
+<td><strong>Semi example</strong></td>
+<td>Thermocouple MCU</td>
+<td>Chamber RTOS</td>
+<td>Equipment PC</td>
+</tr>
+</tbody>
+</table>
+<h3 id="boot-sequence-what-happens-before-main">Boot Sequence (what happens before main)</h3>
+<pre class="hljs"><code><div>Power on / Reset:
+  1. CPU loads SP from vector table[0] (0x00000000)
+  2. CPU loads PC from vector table[1] (0x00000004) → Reset_Handler
+
+Reset_Handler (startup assembly):
+  3. Copy .data section from Flash → RAM (initialized globals)
+  4. Zero .bss section in RAM (uninitialized globals)
+  5. Call SystemInit() → configure clock tree (HSE → PLL → 168 MHz)
+  6. Call __libc_init_array() → C++ static constructors
+  7. Call main()
+
+In main():
+  8. hal::init() → configure all peripherals (GPIO, UART, SPI, timers)
+  9. Start scheduler (RTOS) or enter super-loop (bare metal)
+</div></code></pre>
+<h3 id="linker-script-memory-map">Linker Script (memory map)</h3>
+<pre class="hljs"><code><div>Linker script (.ld file) tells the linker WHERE to put things:
+
+MEMORY {
+    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 1024K
+    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+}
+
+SECTIONS {
+    .isr_vector : { *(.isr_vector) } &gt; FLASH     /* vector table at flash start */
+    .text       : { *(.text*) } &gt; FLASH           /* code */
+    .rodata     : { *(.rodata*) } &gt; FLASH         /* const data, lookup tables */
+    .data       : { *(.data*) } &gt; RAM AT&gt; FLASH   /* initialized globals (copied at boot) */
+    .bss        : { *(.bss*) } &gt; RAM              /* uninitialized globals (zeroed at boot) */
+    ._stack     : { . = . + 0x2000; } &gt; RAM       /* 8KB stack */
+}
+
+Memory map result:
+┌──────────────────┐ 0x08100000
+│                  │
+│  FLASH (1MB)     │  .isr_vector → .text → .rodata → .data (init values)
+│                  │
+├──────────────────┤ 0x08000000
+│                  │
+│  (gap)           │
+│                  │
+├──────────────────┤ 0x20020000
+│  Stack (top)     │  ← SP starts here, grows DOWN
+│  ...             │
+│  Heap            │  ← grows UP (if malloc used)
+│  .bss            │  ← zeroed at boot
+│  .data           │  ← copied from flash at boot
+├──────────────────┤ 0x20000000
+</div></code></pre>
+<h3 id="watchdog-timer">Watchdog Timer</h3>
+<pre class="hljs"><code><div>Independent Watchdog (IWDG):
+  - Separate clock (LSI, ~32 kHz) — runs even if main clock fails
+  - Must be &quot;kicked&quot; periodically or system resets
+  - Once started, CANNOT be stopped (by design — prevents software from disabling safety)
+
+Window Watchdog (WWDG):
+  - Must be kicked WITHIN a time window (not too early, not too late)
+  - Detects both stuck code (too late) and runaway code (too fast)
+
+             ┌─── too early (reset) ───┐
+             │                          │
+  ─────────[═══════ WINDOW ═══════]────────→ too late (reset)
+             │                          │
+             └─── KICK HERE ───────────┘
+
+Semi safety: if control loop hangs → watchdog fires → hardware reset
+  → startup code checks reset reason → enters safe state (valves close, heaters off)
+  → logs fault for diagnosis
+</div></code></pre>
+<h3 id="firmware-update">Firmware Update</h3>
+<pre class="hljs"><code><div>Bootloader (lives in protected flash region, never overwritten):
+
+Boot:
+  1. Check &quot;update pending&quot; flag (set by application before reset)
+  2. If set: receive new firmware over UART/USB/CAN
+  3. Verify CRC / digital signature
+  4. Write to application flash region
+  5. Clear flag, reset → run new firmware
+
+Dual-bank flash (more robust):
+  ┌──────────┬──────────┐
+  │ Bank A   │ Bank B   │
+  │ (active) │ (update) │
+  └──────────┴──────────┘
+  
+  1. Running from Bank A
+  2. Write new firmware to Bank B (application continues running!)
+  3. Verify Bank B CRC
+  4. Swap bank mapping (one register write)
+  5. Reset → now running from Bank B
+  6. If Bank B crashes → watchdog → bootloader → swap back to Bank A (rollback)
+
+Semi use: field firmware update without opening tool, automatic rollback on failure
+</div></code></pre>
+<hr>
+<h2 id="5-semi-equipment-architecture-4-layer-stack">5. Semi Equipment Architecture (4-Layer Stack)</h2>
+<pre class="hljs"><code><div>┌─────────────────────────────────────────────────────────────┐
+│  Factory MES (Manufacturing Execution System)                │
+│  SECS/GEM protocol over TCP/HSMS                            │
+├─────────────────────────────────────────────────────────────┤
+│  Equipment Controller (Windows/Linux, Full OS)               │
+│  Recipe engine, GUI, data collection, SECS/GEM driver        │
+│  Communication: Ethernet TCP/UDP, PCIe, reflective memory    │
+├─────────────────────────────────────────────────────────────┤
+│  Real-Time Controller (VxWorks/QNX/RT-Linux, RTOS)           │
+│  Chamber control, task scheduling, safety interlocks         │
+│  Communication: SPI, I2C, UART, CAN to sensors below        │
+├─────────────────────────────────────────────────────────────┤
+│  Sensor/Actuator MCUs (Bare metal, No-OS)                    │
+│  Single-function: ADC→SPI, PID→PWM, I2C sensor read         │
+│  Communication: SPI/I2C/UART up to RTOS controller           │
+└─────────────────────────────────────────────────────────────┘
+</div></code></pre>
+<p><strong>Bus usage per layer boundary:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Boundary</th>
+<th>Buses used</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Factory → Equipment</td>
+<td>Ethernet (TCP/HSMS)</td>
+<td>Standard factory protocol, long distance</td>
+</tr>
+<tr>
+<td>Equipment → RTOS</td>
+<td>Ethernet, PCIe, reflective memory</td>
+<td>High bandwidth, medium latency OK</td>
+</tr>
+<tr>
+<td>RTOS → Sensor MCU</td>
+<td>SPI, I2C, UART, CAN</td>
+<td>Low pin count, short distance, simple</td>
+</tr>
+<tr>
+<td>MCU → Physical sensor</td>
+<td>Analog (ADC), SPI (digital sensor)</td>
+<td>Direct electrical connection</td>
+</tr>
+</tbody>
+</table>
+
+</body>
+</html>

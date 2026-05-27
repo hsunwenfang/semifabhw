@@ -58,17 +58,16 @@ struct Reg {
     static void clear_bits(uint32_t mask) { ref() &= ~mask; }
 };
 
-// Usage
+// constexpr guarantees compile-time fixed, thus can be templated
 constexpr uint32_t GPIOA_ODR = 0x40020014;
 Reg<GPIOA_ODR>::set_bits(1 << 5);  // set pin 5 high
 ```
 
 ## virtual and override
 
-- virtual prefixed parent method should be overridden by child method
+- virtual prefixed base method should be overridden by derived method
 - virtual uint64_t micros() = 0; -> `=0` means pure virtual where base cannot provide implementation
-- override-suffixed child method lets compiler safety check
-    - w/o override may cause wrong parameter
+- override-suffixed derived method lets compiler safety check against wrong paras
 - compiler stores virtual parent fns in vtable
 - Cost : child fns points to the parent fns in vtable + indirect call when virtual function call
 
@@ -670,3 +669,229 @@ InstalledDir: /Library/Developer/CommandLineTools/usr/bin
 int		getaddrinfo(const char * __restrict, const char * __restrict,
 			    const struct addrinfo * __restrict,
 			    struct addrinfo ** __restrict);
+
+---
+
+# Embedded C++ Patterns
+
+## 1. RAII scope guard — auto-release hardware resources
+
+```cpp
+struct CriticalSection {
+    CriticalSection()  { __disable_irq(); }
+    ~CriticalSection() { __enable_irq(); }
+};
+
+void transfer() {
+    CriticalSection cs;          // interrupts disabled
+    shared_buf[idx++] = data;
+}                                // ~CriticalSection() re-enables — even if early return
+
+// Generic scope guard (C++17)
+template<typename F>
+struct ScopeGuard {
+    F fn;
+    ~ScopeGuard() { fn(); }
+};
+// usage: ScopeGuard guard{[] { HAL_SPI_Release(); }};
+```
+
+## 2. ISR ↔ main communication
+
+```cpp
+// ISR sets flag — main polls
+volatile bool data_ready = false;
+
+// ISR (runs in interrupt context — no heap, no blocking)
+extern "C" void USART1_IRQHandler() {
+    rx_buf.push(USART1->DR);   // lock-free ring buffer
+    data_ready = true;
+}
+
+// main loop
+while (true) {
+    if (data_ready) {
+        data_ready = false;
+        process(rx_buf.pop());
+    }
+    __WFI();  // sleep until next interrupt
+}
+```
+
+## 3. Ring buffer — lock-free, fixed-size, ISR-safe
+
+```cpp
+template<typename T, size_t N>
+struct RingBuffer {
+    static_assert((N & (N - 1)) == 0, "N must be power of 2");
+    T buf[N]{};
+    volatile size_t head = 0;  // written by producer (ISR)
+    volatile size_t tail = 0;  // written by consumer (main)
+
+    bool push(T val) {
+        size_t next = (head + 1) & (N - 1);
+        if (next == tail) return false;  // full
+        buf[head] = val;
+        head = next;
+        return true;
+    }
+    bool pop(T& out) {
+        if (head == tail) return false;  // empty
+        out = buf[tail];
+        tail = (tail + 1) & (N - 1);
+        return true;
+    }
+};
+```
+
+## 4. Static / pool allocation — no heap
+
+```cpp
+// Fixed pool — no malloc, no fragmentation
+template<typename T, size_t N>
+struct Pool {
+    std::aligned_storage_t<sizeof(T), alignof(T)> storage[N];
+    bool used[N]{};
+
+    T* alloc() {
+        for (size_t i = 0; i < N; ++i)
+            if (!used[i]) { used[i] = true; return reinterpret_cast<T*>(&storage[i]); }
+        return nullptr;
+    }
+    void free(T* p) {
+        size_t i = reinterpret_cast<std::aligned_storage_t<sizeof(T), alignof(T)>*>(p) - storage;
+        p->~T();
+        used[i] = false;
+    }
+};
+
+Pool<Packet, 16> pkt_pool;  // 16 Packets, all on stack/static
+```
+
+## 5. Placement new — construct at specific memory
+
+```cpp
+// DMA buffer at fixed address
+alignas(32) uint8_t dma_buf[sizeof(Packet)];
+
+Packet* p = new (dma_buf) Packet{.id = 1, .temp = 36.5};  // no malloc
+// ... use p ...
+p->~Packet();  // explicit destructor, no delete
+```
+
+## 6. State machine — enum + transition function
+
+```cpp
+enum class State { Idle, Heating, Stabilize, Processing, Fault };
+enum class Event { Start, TempReached, Done, Error, Reset };
+
+State transition(State s, Event e) {
+    switch (s) {
+        case State::Idle:
+            if (e == Event::Start) return State::Heating;
+            break;
+        case State::Heating:
+            if (e == Event::TempReached) return State::Stabilize;
+            if (e == Event::Error) return State::Fault;
+            break;
+        case State::Stabilize:
+            if (e == Event::Done) return State::Processing;
+            break;
+        case State::Fault:
+            if (e == Event::Reset) return State::Idle;
+            break;
+        default: break;
+    }
+    return s;  // no transition
+}
+```
+
+## 7. Type-safe units — prevent mixing
+
+```cpp
+struct Milliseconds { uint32_t v; };
+struct Microseconds { uint32_t v; };
+struct Celsius      { double v; };
+
+void delay(Milliseconds ms);         // can't accidentally pass µs
+void set_temp(Celsius target);       // can't pass raw double
+
+// compile error: delay(Microseconds{100});
+```
+
+## 8. Double buffering — DMA ping-pong
+
+```cpp
+alignas(32) uint16_t adc_buf[2][256];  // two buffers
+volatile int active = 0;               // DMA writes to active
+
+extern "C" void DMA1_IRQHandler() {
+    active ^= 1;                       // swap
+    DMA1->M0AR = (uint32_t)adc_buf[active];  // point DMA to new buffer
+}
+
+// main processes the inactive buffer — no race
+void process() {
+    uint16_t* safe = adc_buf[active ^ 1];
+    for (int i = 0; i < 256; ++i) { /* use safe[i] */ }
+}
+```
+
+## 9. Error handling without exceptions
+
+```cpp
+enum class Err { Ok, Timeout, CrcFail, BusError };
+
+struct Result {
+    double value;
+    Err err;
+    explicit operator bool() const { return err == Err::Ok; }
+};
+
+Result read_sensor(uint8_t addr) {
+    if (!i2c_start(addr)) return {0, Err::BusError};
+    uint16_t raw = i2c_read16();
+    if (!verify_crc(raw))  return {0, Err::CrcFail};
+    return {raw * 0.01, Err::Ok};
+}
+
+// usage
+if (auto r = read_sensor(0x48); r) {
+    temperature = r.value;
+} else {
+    handle_error(r.err);
+}
+```
+
+## 10. Compile-time platform selection
+
+```cpp
+template<typename MCU> struct Gpio;
+
+struct Stm32F4 {};
+struct Stm32H7 {};
+
+template<> struct Gpio<Stm32F4> {
+    static void set(int pin) { GPIOA->BSRR = (1 << pin); }
+};
+template<> struct Gpio<Stm32H7> {
+    static void set(int pin) { GPIOA->BSRRL = (1 << pin); }
+};
+
+using Led = Gpio<Stm32F4>;  // single point of platform change
+Led::set(5);
+```
+
+
+                    ┌─────────────────────┐
+                    │  ISR ↔ Main Loop    │  ← the core constraint
+                    └────────┬────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+  Sync/Safety         Memory/No-Heap        Architecture
+  ─────────────       ──────────────        ────────────
+  #1 RAII guard       #4 Pool alloc         #6 State machine
+  #2 ISR comm         #5 Placement new      #7 Type-safe units
+  #3 Ring buffer      #8 Double buffer      #9 Error w/o exceptions
+                                            #10 Platform selection

@@ -1,9 +1,102 @@
 # Embedded System Design Patterns
 
+> Software patterns for structuring embedded code.
+> For hardware fundamentals (CPU registers, buses, system layers), see [embeded-system-hw.md](embeded-system-hw.md).
+
+---
+
+## System Context & Troubleshooting
+
+### Troubleshooting Categorized by Layer Interaction
+
+> Architecture overview and bus details → [embeded-system-hw.md § 5](embeded-system-hw.md#5-semi-equipment-architecture-4-layer-stack)
+
+```
+┌──────────────────────────────────────────────────────┐
+│              Full OS (Equipment Controller)            │
+├──────────────────────────────────────────────────────┤
+│              RTOS (Chamber Controllers)               │
+├──────────────────────────────────────────────────────┤
+│              No-OS (Sensor/Actuator MCUs)             │
+└──────────────────────────────────────────────────────┘
+```
+
+#### No-OS internal (single MCU bugs)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 1 | **Stack overflow** | Deep call chain / large local arrays | Canary pattern, check SP |
+| 2 | **ISR ↔ main data tear** | Non-atomic read of multi-byte struct | Critical section or double-buffer |
+| 3 | **Missed interrupts** | Critical section too long | Timer measure IRQ-disabled duration |
+| 4 | **Timing jitter** | Super-loop iteration time varies | Hardware timer trigger, not software delay |
+| 5 | **Watchdog reset loop** | One code path forgets to kick | Store state in backup register before reset |
+| 6 | **Heisenbug** | Debug printf changes timing | GPIO toggle + scope (zero overhead) |
+
+#### No-OS ↔ No-OS (sensor-to-sensor, rare)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 7 | **CAN bus contention** | Two MCUs transmit simultaneously, lower-priority always loses | Check CAN priority assignment, add jitter |
+| 8 | **Daisy-chain SPI desync** | One MCU resets, shifts all downstream data by N bits | Frame delimiter + CRC per device |
+| 9 | **Shared sensor conflict** | Two MCUs try to read same I2C sensor | Bus arbitration failure → assign master |
+
+#### RTOS ↔ No-OS (controller to sensor MCU)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 10 | **Command/response mismatch** | RTOS sends next cmd before MCU finished previous | Sequence number protocol, wait-for-ACK |
+| 11 | **I2C/SPI bus lockup** | MCU reset mid-transaction, slave holds bus | 9-clock recovery, bus timeout watchdog |
+| 12 | **Sensor data stale** | MCU hung or crashed, RTOS reads old buffer | Timestamp in every packet, reject if too old |
+| 13 | **Baud rate mismatch after update** | MCU firmware updated, RTOS not updated | Version handshake at boot |
+| 14 | **DMA overrun** | RTOS polls too slow, MCU's DMA wraps around buffer | Flow control: MCU signals "buffer full" |
+
+#### RTOS internal (single controller bugs)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 15 | **Priority inversion** | Low-prio task holds mutex needed by high-prio | Priority inheritance, Tracealyzer |
+| 16 | **Deadlock** | Task A waits on B's mutex, B waits on A's | Lock ordering convention, timeout on all mutexes |
+| 17 | **Task starvation** | One task never yields, lower-prio tasks starve | Preemptive scheduler + time-slice for same-priority |
+| 18 | **Memory leak (heap)** | Dynamic alloc in task without matching free | Pool allocator instead of malloc, track high-water |
+| 19 | **Race in shared state** | Two tasks modify recipe state without lock | Mutex or message-passing (share nothing) |
+
+#### RTOS ↔ RTOS (peer controller coordination)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 20 | **Lost handoff message** | UDP dropped, no retry | Sequence + ACK + timeout + retry |
+| 21 | **Split-brain** | Network partition, both think they're master | Heartbeat timeout → safe-state, single arbitrator |
+| 22 | **Ordering violation** | Chamber B starts before transfer confirms placement | State machine enforces preconditions |
+| 23 | **Clock drift** | Two boards disagree on timestamps → wrong sequence | PTP (IEEE 1588) or NTP sync, or use sequence numbers not time |
+| 24 | **Reflective memory stale** | Writer crashes, reader sees old valid data | Generation counter + watchdog bit in shared mem |
+
+#### Full-OS ↔ RTOS (equipment host to chamber)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 25 | **Recipe step timeout** | RTOS stuck in fault state, host keeps waiting | Host-side watchdog per step with configurable timeout |
+| 26 | **Parameter mismatch** | Host sends float, RTOS expects fixed-point | Interface definition (IDL), version in message header |
+| 27 | **Network buffer overflow** | Host floods RTOS with commands faster than processed | Flow control: RTOS ACKs each command before next |
+| 28 | **Log correlation** | Bug spans host + RTOS, timestamps don't match | Synchronized time (PTP), unified trace ID |
+
+#### Full-OS ↔ Factory (SECS/GEM)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 29 | **HSMS connection drop** | Network switch failover, tool goes offline | Auto-reconnect with state recovery |
+| 30 | **Recipe download corrupt** | Large recipe > single message, assembly error | Chunked transfer + CRC + verify-after-write |
+
 ## Hardware Abstraction Patterns
+
+> CPU registers, memory-mapped I/O, bus architecture → [embeded-system-hw.md § 1](embeded-system-hw.md#1-compute--cpu--registers)
 
 ### 1. Hardware Abstraction Layer (HAL) with polymorphism
 
+```armasm
+ldr  r0, [obj]         // load vptr from object (memory read #1)
+ldr  r1, [r0, #4]     // load function address from vtable (memory read #2)
+blx  r1               // indirect branch to unknown address
+```
 
 ```cpp
 class IGpio {
@@ -27,7 +120,7 @@ public:
 
 Wrap memory-mapped I/O registers in typed structs with `volatile` pointer access.
 Use `static_assert` on struct sizes to guarantee layout matches hardware documentation. 
-`Reg<Addr>` template use template hence no runtime burden
+`Reg<Addr>` template finishes at compile time
 
 ```cpp
 template<uint32_t Addr>
@@ -39,7 +132,7 @@ struct Reg {
     static void clear_bits(uint32_t mask) { ref() &= ~mask; }
 };
 
-// Usage
+// constexpr is guranteed to be resolved at compile time -> can be templated
 constexpr uint32_t GPIOA_ODR = 0x40020014;
 Reg<GPIOA_ODR>::set_bits(1 << 5);  // set pin 5 high
 // static_assert
@@ -60,6 +153,8 @@ target_sources(app PRIVATE bsp_sim.cpp)
 ---
 
 ## Concurrency / Scheduling Patterns
+
+> Interrupt hardware mechanics (NVIC, vector table, context save) → [embeded-system-hw.md § 2](embeded-system-hw.md#2-interrupt-hardware-nvic)
 
 ### 4. Super Loop
 
@@ -82,6 +177,46 @@ int main() {
     }
 }
 ```
+
+**Why >3 tasks breaks a super-loop:**
+
+The cycle period is dictated by the fastest task. All tasks must complete within that period:
+
+```
+Tasks:  A=1kHz(1ms)  B=100Hz(10ms)  C=10Hz(100ms)  D=1Hz(1s)
+
+Super-loop cycle MUST be ≤ 1ms (fastest task dictates):
+┌─────────────────────────────────────────┐
+│ A(200µs) │ B(300µs) │ C(400µs) │ D(?)  │ ← 900µs used, 100µs left
+└─────────────────────────────────────────┘
+                                     ^ D can't fit → deadline miss
+```
+
+| # Tasks | Problem |
+|---|---|
+| 1-2 | Fine — both fit in cycle budget |
+| 3 | Tight — sum of WCETs approaches cycle time, jitter appears |
+| 4+ | **Deadline miss** — can't fit all in fastest period |
+| Mixed rates | Waste — running 1Hz task every 1ms = 999 no-op checks |
+
+**What you graduate to:**
+
+| Scheduler | Solves |
+|---|---|
+| Cooperative (time-triggered) | Only runs tasks when due — no wasted checks. Still no preemption |
+| Preemptive (RTOS) | Fastest task **interrupts** slower ones mid-execution → always meets deadline |
+
+```
+Preemptive timeline:
+──────────────────────────────────────────────
+A ▓▓▓   ▓▓▓   ▓▓▓   ▓▓▓   (every 1ms, highest prio, always runs)
+B    ▓▓▓▓       ▓▓▓▓        (every 10ms, preempted by A)
+C         ░░▓▓░░▓▓░░░        (every 100ms, preempted by A & B)
+D                        ▓▓▓ (every 1s, lowest priority)
+──────────────────────────────────────────────
+```
+
+Super-loop = equal time-sharing. Real systems have **unequal deadlines** → preemption lets critical tasks always win.
 
 ### 5. Interrupt / ISR Pattern
 

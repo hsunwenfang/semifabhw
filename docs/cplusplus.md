@@ -508,6 +508,7 @@ Stage 3: ASSEMBLE — g++ -c (or 'as')
 Stage 4: LINK — g++ (calls ld internally)
 
     - g++ main.o -o main
+    - file main -> check the dynamic loader
 
 All at once
 
@@ -570,21 +571,30 @@ All at once
 ## 4. Link ld
 
 - Linker resolves compile-yielded symbols by name — it does not re-check types.
+1. Linker time
+    - Linker marks executable as dynamically linked.
+    - writes metadata to executable
+        - PT_INTERP (loader path, e.g. ld-linux-x86-64.so.2)
+        - DT_NEEDED entries (required shared libs)
+2. Runtime (after build, when you run executable)
+    - Kernel reads PT_INTERP and starts the dynamic loader.
+    - Loader resolves shared libraries and verifies arch / version
 - ODR happens when 2 .o is compiled with version-diff shared.h
-- .o (object file)
-    - Symbols: unresolved (U = undefined)
-    - Not loadable at runtime
-    - Contains one .cpp's machine code
-    - Position-independent: not required
-    - Used by linker (ld) at build time
-- .so / .dylib (shared library)
-    - Symbols: all resolved
-    - Loadable at runtime (dlopen / ctypes.CDLL)
-    - Contains linked, complete library
-    - Position-independent: yes, needs `-fPIC`
-    - Used by OS loader at runtime
-    - `extern "C"` required for Python/C interop (no mangling)
-    - `g++ -std=c++17 -shared -fPIC pid_lib.cpp -o libpid.dylib`
+
+```text
++----------------------+-------------------------------+-----------------------------------------------+
+| Property             | .o (object file)              | .so / .dylib (shared library)                 |
++----------------------+-------------------------------+-----------------------------------------------+
+| Symbols              | unresolved (U = undefined)    | all resolved                                  |
+| Runtime loadable     | no                            | yes (dlopen / ctypes.CDLL)                    |
+| Contents             | one .cpp's machine code       | linked, complete library                      |
+| Position-independent | not required                  | yes, typically needs -fPIC                    |
+| Primary use          | linker (ld) at build time     | OS loader at runtime                          |
++----------------------+-------------------------------+-----------------------------------------------+
+```
+.so properties
+- extern "C" for Python/C interop (no mangling)
+- g++ -std=c++17 -shared -fPIC pid_lib.cpp -o libpid.dylib
 
 ### Mangling and symbol
 

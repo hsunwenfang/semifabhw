@@ -14,9 +14,9 @@ No-OS (bare-metal)              RTOS                           Full OS (Linux)
 │                  │           │  Task A PSP      │          │                  │
 │                  │           │  (512B-4KB)      │          │  (free space)    │
 │                  │           ├──────────────────┤          │                  │
-│  (free space)    │           │  Task B PSP      │          │  Heap            │
-│                  │           │  (512B-4KB)      │          │  grows ↑         │
-│                  │           ├──────────────────┤          │  (malloc/new)    │
+│  (free space)    │           │  Task B PSP      │  per     │  Heap            │
+│                  │           │  (512B-4KB)      │  task    │  grows ↑         │
+│                  │           ├──────────────────┤  stack   │  (malloc/new)    │
 │                  │           │  Task C PSP      │          ├──────────────────┤
 │  ← NO HEAP →     │           │  (512B-4KB)      │          │  .bss            │
 │                  │           ├──────────────────┤          │  .data           │
@@ -29,51 +29,45 @@ No-OS (bare-metal)              RTOS                           Full OS (Linux)
 │  .data           │           ├──────────────────┤
 │  (calibration)   │           │  .text (code)    │
 ├──────────────────┤           │  + RTOS kernel   │
-│  .text (code)    │           └──────────────────┘ LOW
+│.text stores      │           └──────────────────┘ LOW
+│HardFault_Handler │
 └──────────────────┘ LOW
 ```
 
-Key differences:
-No-OS:  1 stack (MSP), no heap, simple layout
-RTOS:   1 MSP + N PSPs, optional heap, stacks adjacent in RAM
-Full OS: virtual memory, per-process isolation, large heap
+#### Key differences
+`No-OS`  1 stack (MSP), no heap, simple layout
+  - dies if MSP corrupts
+`RTOS`   1 MSP + N PSPs, optional heap, stacks adjacent in RAM
+`Full OS` virtual memory, per-process isolation, large heap
+
+#### virtual memory and smart pointer
+
+[Q] compare vector<int> a(10, 0) and int[10] a. in terms of heap / stack / virtual memory structure
+
+**Answer:** This is a fundamental C++ memory question.
+
+| Aspect | `int a[10];` (in a function) | `std::vector<int> a(10, 0);` |
+| :--- | :--- | :--- |
+| **Data Location** | **Stack** | **Heap** |
+| **Control Object** | None (the variable `a` is the array) | A small object on the **Stack** that manages the heap data |
+| **Allocation** | Very fast, single stack pointer adjustment. | Slower, involves a call to the heap allocator (`malloc`). |
+| **Lifetime** | Automatically destroyed when function exits. | Heap data is automatically freed when the vector object on the stack goes out of scope (RAII). |
+| **Flexibility** | Size must be a compile-time constant. | Size can be determined and changed at runtime (e.g., `resize()`, `push_back()`). |
+
+### Heap / Stack issue
+
+`int a[10];`
+  - puts the data directly on the stack.
+`std::vector`
+  - smart containers puts a small manager object on the stack
+  - and this manager allocates and controls a block of data on the heap.
+`memory leak` happens if direct memalloc to heap without a proper gc -> `free` has to be explicitly called
 
 ### MSP Main Stack Pointer vs PSP Process Stack Pointer (dual stack pointers)
 
 - stack pointer points to current top of the stack
-- moves at every push/pop including function calls
-- fn call move down the stack pointer while fn returns turn SP back up
-- MSP is the return point if curr PSP corrupted
-
-```
-Bare metal (no RTOS):
-  Only MSP used — one stack for everything
-
-RTOS:
-  MSP = kernel + ISRs (shared, small)
-  PSP = per-task stack (each task gets its own)
-  Context switch = save PSP of old task, load PSP of new task
-```
-
-### Stack Mechanics
-
-```
-Function call (BL instruction):
-  1. LR ← return address (PC + 4)
-  2. PC ← target function
-  3. Callee pushes {r4-r11, lr} onto stack (PUSH instruction)
-  4. SP decremented by frame size
-
-Stack grows DOWN on ARM (high address → low address):
-┌────────────┐ 0x20008000 (stack top / initial SP)
-│ main frame │
-│ func_a frame│
-│ func_b frame│ ← SP here during func_b
-│            │
-│   (free)   │
-└────────────┘ 0x20000000 (RAM start)
-```
-Stack overflow = SP goes below allocated region → corrupts heap/globals
+- moves at every push/pop including function calls and variables
+- fn call grow down the stack pointer while fn returns shrink SP back up
 
 ### Memory guards
 
@@ -81,11 +75,11 @@ Stack overflow = SP goes below allocated region → corrupts heap/globals
   — MPU region (if configured), 32–256 bytes → protects .bss from MSP overflow
 - **RTOS**
   - MPU region, 32 bytes → protects task stacks from MSP overflow
-  — MPU region per task, 32 bytes → protects Task B from Task A overflow
-  — MPU region, 32 bytes → protects .bss/heap from bottom task overflow
 - **Full OS**
   — Unmapped MMU page, 4 KB → protects adjacent memory from stack overflow
   — Unmapped MMU page, 4 KB → between heap allocations (ASAN)
+
+---
 
 ## 1. Compute — CPU & Registers
 
@@ -98,18 +92,15 @@ Stack overflow = SP goes below allocated region → corrupts heap/globals
 | **r12 (IP)** | 32-bit | Intra-procedure scratch |
 | **SP (r13)** | 32-bit | Stack pointer (MSP or PSP) |
 | **LR (r14)** | 32-bit | Return address (or magic EXC_RETURN in ISR) |
-| **PC (r15)** | 32-bit | Program counter — next instruction to execute |
+| **PC (r15)** | 32-bit | Program Counter — next instruction to execute |
 | **xPSR** | 32-bit | Flags (N/Z/C/V), exception number, thumb bit |
 | **CONTROL** | 2-bit | Privilege level (0=privileged) + stack select (MSP/PSP) |
 
 ### Pipeline: Fetch → Decode → Execute
 
-- Fetch
-  - fetch the instruction 0xF1000A05 using `Flash` address 0x08001000
-- Decode
-  - translate 0xF1000A05 into real HW actions using CPU native logic
-- Execute
-  - register, ALU executes
+`Fetch` : fetch the instruction 0xF1000A05 using `Flash` address 0x08001000
+`Decode` : translate 0xF1000A05 into real HW actions using CPU native logic
+`Execute` : register, ALU executes
 
 ```
 Cortex-M4: 3-stage pipeline -> improve over sequential
@@ -126,50 +117,29 @@ Decode:       [A]  [B]  [C]  [--] [--] [T]
 Execute:           [A]  [B]  [C]       [--]  [T]
 
 Branch = 2-3 cycle penalty (pipeline flush + refill)
-This is why tight loops >> frequent branching on MCU
-```
-- use predictable branching (for-loop) in MCU
-
-### Bit-banding (Cortex-M3/M4)
-
-```
-Problem: read-modify-write on a register bit is NOT atomic
-  LDR r0, [GPIOA_ODR]   ← read
-  ORR r0, r0, #(1<<5)   ← modify
-  STR r0, [GPIOA_ODR]   ← write  ← ISR can fire between read and write!
-
-Solution: bit-band region maps each BIT to a unique 32-bit ADDRESS
-  Writing 1 to that address sets ONLY that bit, atomically
-
-Bit-band alias address formula:
-  bit_alias = BITBAND_BASE + (byte_offset × 32) + (bit_number × 4)
-
-// Set GPIOA bit 5 atomically — single store instruction, no RMW race
-*(volatile uint32_t*)(0x42000000 + (0x20014 * 32) + (5 * 4)) = 1;
 ```
 
-### Memory-Mapped I/O
+- This is why tight loops >> frequent branching on MCU
+- use `predictable branching` (for-loop) in MCU
 
-`Flash` stores non-volatile data
+### Bit-banding for atomic read-write
 
-```
-Peripherals ARE memory addresses — same bus, same load/store instructions:
+- bit-band region maps each BIT to a unique 32-bit ADDRESS
+- Writing 1 to that address sets ONLY that bit, atomically
 
-Address range        | What lives there
----------------------|-----------------------------
-0x00000000-0x07FFFFFF | Flash (code + const data)
+### DPC (Direct Peripheral Control) through memory mapping
+
+start Peripherals via memory addresses w/o polling
+
+0x00000000-0x07FFFFFF | Flash (code + const data) -> `non-volatile`
 0x20000000-0x3FFFFFFF | SRAM (variables, stack, heap)
 0x40000000-0x5FFFFFFF | Peripherals (GPIO, UART, SPI, TIM, ADC...)
 0xE0000000-0xFFFFFFFF | System (NVIC, SysTick, SCB, MPU, debug)
 
-To control hardware = write to specific address:
-  *(volatile uint32_t*)0x40020014 = (1 << 5);  // GPIOA pin 5 high
-
 volatile = compiler must read/write every time (no caching in register)
 reinterpret_cast = integer → pointer (different types, same bit pattern)
-```
 
-### MCU internal Bus Architecture (AHB / APB)
+### MCU internal Bus Architecture (AHB / APB) as the pathway for DPC
 
 Bus shares wires that carry address + data between CPU and MCU peripherals
 ```
@@ -186,7 +156,7 @@ Bus shares wires that carry address + data between CPU and MCU peripherals
              └─────┘     └─────┘     └─────┘     └─────┘
 ```
 
-Bus matrix (a hardware router built into the chip) looks at the top bits of the address
+`Bus matrix` (a hardware router built into the chip) looks at the top bits of the address
 Based on those bits, one chip-select line (HSEL) electric signal is sent to the device
 device responds on the data bus
 
@@ -199,20 +169,9 @@ Fetch stage in full:
 
 ### DMA (Direct Memory Access)
 
+CPU configures DMA, then DMA moves data and polling for CPU
+
 ```
-CPU configures DMA, then DMA moves data WITHOUT CPU involvement:
-
-Without DMA (CPU polling):
-  CPU: read byte → store to buffer → read byte → store → ... (100% CPU busy)
-
-With DMA:
-  CPU: configure(src=UART_DR, dst=buffer, count=256, trigger=RXNE)
-  DMA: [moves bytes automatically as they arrive]
-  CPU: [free to do other work]
-  DMA: [fires interrupt when transfer complete]
-  CPU: [processes full buffer]
-
-DMA channels/streams connect peripherals to memory:
 ┌─────────┐     ┌─────────┐     ┌─────────┐
 │ UART DR │────→│  DMA    │────→│  SRAM   │  (peripheral → memory)
 │ ADC  DR │────→│ Engine  │────→│ buffer  │
@@ -221,58 +180,21 @@ DMA channels/streams connect peripherals to memory:
 ```
 
 **DMA modes:**
-- Peripheral -> Memory: read peripheral data register into RAM buffer. Semi use: UART RX, ADC sampling.
-- Memory -> Peripheral: write RAM buffer to peripheral. Semi use: UART TX, DAC output.
-- Memory -> Memory: copy between RAM regions. Semi use: buffer management.
-- Circular: auto-restart when count reaches zero. Semi use: continuous ADC streaming.
-- Double-buffer: alternate between two buffers. Semi use: zero-copy processing.
+- `Peripheral -> Memory`: read peripheral data register into RAM buffer. Semi use: UART RX, ADC sampling.
+- `Memory -> Peripheral`: write RAM buffer to peripheral. Semi use: UART TX, DAC output.
+- `Memory -> Memory`: copy between RAM regions. Semi use: buffer management.
+- `Double-buffer`: alternate between two buffers. Semi use: zero-copy processing.
 
 ### Clock Tree
 
-`HSE` Quartz crystal (8 MHz) / `HSI` RC circuit oscillator (16 MHz)
-  → `PLL` multiplies to 168 MHz `SYSCLK`
-    → `AHB` prescaler ÷1 = 168 MHz (CPU, SRAM, DMA)
-      → `APB2` prescaler ÷2 = 84 MHz (SPI1's bus clock)
-        → `RCC` Reset and Clock Control clock gate enables SPI1 (RCC->APB2ENR |= SPI1EN)
-          → `SPI1` internal prescaler ÷8 = 10.5 MHz
-            → `SCLK` pin toggles at 10.5 MHz
-              → External `ADC` chip receives clock, sends data back on `MISO`
-
-HSE/HSI → PLL → SYSCLK
-→ AHB (168MHz) for CPU core / SRAM / DMA / GPIO / Flash mem
-→ APB2 (84MHz) for fast peripherals (SPI1, USART1)
-→ APB1 (42MHz) for slow peripherals (USART2, I2C, SPI2)
-
-`SPI` Serial Peripheral Interface has 4 wires
-  - MOSI : master out slave in
-  - MISO : master in slave out
-  - SCLK : Master procides clock
-  - CS : Master selects which slave
-  - MOSI and MISO shares shift register -> `full duplex`
-
+`HSE/HSI` → `PLL` → `SYSCLK`
+→ `AHB` (168MHz) for CPU core / SRAM / DMA / GPIO / Flash mem
+→ `APB2` (84MHz) for fast peripherals (SPI1, USART1)
+→ `APB1` (42MHz) for slow peripherals (USART2, I2C, SPI2)
 
 Wrong clock setup
-- UART sends garbage → baud rate calculated from wrong SYSCLK
+- `UART` sends garbage → baud rate calculated from wrong SYSCLK
 - `SPI` too fast for slave → clock divider assumes wrong input frequency
-- Timer interrupt at wrong rate → prescaler math uses wrong APB clock
-
-### Power Modes (hardware feature — used by No-OS and RTOS, not Full OS)
-
-- **Run** — everything on, active processing
-- **Sleep** — CPU clock off, peripherals still running
-  - Wake: any interrupt (~1µs wake time)
-  - No-OS: `__WFI()` in idle loop
-  - RTOS: idle task calls `__WFI()` automatically
-  - Semi: waiting for next ADC cycle
-- **Stop** — all clocks off except LSI/LSE, voltage regulator low-power
-  - Wake: EXTI pin change or RTC alarm (~5µs wake time)
-  - RTOS: tickless idle mode (`configUSE_TICKLESS_IDLE`)
-  - Semi: idle tool waiting for wafer to arrive
-- **Standby** — everything off except backup domain, RAM contents LOST
-  - Wake: WKUP pin or RTC (~50µs + full re-init, like a reboot)
-  - Semi: long idle, battery-backed sensor logging
-- Full OS (Linux) rarely uses these — always running GUI/comms, never idle long enough
-- These are just register writes (`SCB->SCR` + `__WFI()`) — not OS features
 
 ### Fault Handlers
 
@@ -287,11 +209,10 @@ Wrong clock setup
 - **UsageFault** — undefined instruction, unaligned access
   - Typical bug: corrupted function pointer, wrong Thumb bit
 
-`CFSR` is a 32-bit register split into 3 sub-registers:
+`CFSR` is a 32-bit register split into 3 sub-registers for `cpu` to know the fault
 - Bits [7:0] = `MMFSR` (MemManage faults — which MPU violation)
 - Bits [15:8] = `BFSR` (BusFault — which bus error)
 - Bits [31:16] = `UFSR` (UsageFault — undefined instr, alignment, etc.)
-
 `SCB` = System Control Block — a set of memory-mapped registers at 0xE000ED00 that control core CPU behavior
 
 ```cpp
@@ -313,48 +234,23 @@ void fault_dump(uint32_t* frame) {
     // Log to flash, blink LED, halt
 }
 ```
-
-### Debug Interface
-
-| Interface | Wires | Speed | Use |
-|---|---|---|---|
-| **SWD** | 2 (SWDIO + SWCLK) | up to 4 MHz | Standard debug for Cortex-M |
-| **JTAG** | 5 (TDI/TDO/TMS/TCK/TRST) | up to 10 MHz | Legacy, more pins, daisy-chain |
-| **ITM** | Over SWD (no extra pins) | ~1 Mbps | printf-style trace without UART |
-| **ETM** | 4+ trace pins | Full speed | Instruction trace ($$$ probes) |
-
 ---
 
 ## 2. Interrupt Hardware (NVIC)
 
 ### How an interrupt works — CPU register level
 
-- Use `volatile` for shared var to avoid optimize-away of compiler
-
-`PC`: Program Counter
-address of the next instruction to execute in Flash Code memory.
-
-`SP`: Stack Pointer
-Points to the current top of stack of MSP or PSP
-
-`r0`: General-purpose register 0
-Used for temporary values, function arguments, and return values.
-
-`LR`: Link Register
-Stores return address after a function call.
-In exceptions/interrupts, LR often contains a special EXC_RETURN value instead of a normal code address.
-
 Normal execution:
   CPU fetches instructions at addresses pointed to by PC
   PC: 0x1000 → 0x1004 → 0x1008 → 0x100C → ...
 
 Interrupt fires (e.g., UART byte received):
-  1. Peripheral sets flag bit in its status register
-  2. NVIC (Nested Vectored Interrupt Controller) sees the flag
-  3. NVIC forces CPU to:
-     a. Push registers (r0-r3, r12, LR, PC, xPSR) onto stack  ← context save
-     b. Load `ISR PC` from VECTOR TABLE at fixed address
-     c. Execute the `ISR` interrupt service routine function
+- Peripheral sets flag bit in its status register
+- NVIC (Nested Vectored Interrupt Controller) sees the flag
+- NVIC forces CPU to:
+  - Push registers (r0-r3, r12, LR, PC, xPSR) onto stack  ← context save
+  - Load `ISR PC` from `VECTOR TABLE` at fixed address
+-  Execute the `ISR` interrupt service routine function
 
 ```
 CPU registers BEFORE interrupt:
@@ -398,30 +294,17 @@ fixed Address 0x00000000 (flash start on Cortex-M):
 └─────────────────────────────────┘
 ```
 
-### NVIC Registers
-
-| Register | Role |
-|---|---|
-| **ISER[n]** | Interrupt Set-Enable — write 1 to enable |
-| **ICER[n]** | Interrupt Clear-Enable — write 1 to disable |
-| **ISPR[n]** | Interrupt Set-Pending — force pending (software trigger) |
-| **ICPR[n]** | Interrupt Clear-Pending — clear pending flag |
-| **IPR[n]** | Interrupt Priority — 0=highest, 255=lowest |
-| **IABR[n]** | Interrupt Active Bit — read-only, 1 if currently executing |
-
 ### Priority Grouping for Nesting ISR
 
-```
 8 priority bits split into: [preemption priority | sub-priority]
-  - Preemption priority: higher prio ISR can interrupt lower prio ISR
-  - Sub-priority: tie-breaker when two ISRs pend simultaneously
-```
+- Preemption priority: higher prio ISR can interrupt lower prio ISR
+- Sub-priority: tie-breaker when two ISRs pend simultaneously
 
 ### Tail-chaining and Late-arriving
 
 - w/o tail-chaining, back-to-back ISRs pay full pop then push overhead each switch.
-- Tail-chaining skips that overhead when one ISR finishes and another is already pending (A -> B).
-- Late-arriving lets a newly arrived higher-priority ISR preempt entry of a lower-priority one (B first, then A).
+- `Tail-chaining` skips that overhead when one ISR finishes and another is already pending (A -> B).
+- `Late-arriving` lets a newly arrived higher-priority ISR preempt entry of a lower-priority one (B first, then A).
 
 ### Callback — the software equivalent
 
@@ -437,7 +320,7 @@ Task function pointer  = function pointer invoked by SCHEDULER
 
 ```cpp
 // Callback = fn pointer stored for runtime invocation
-//       handles heavy interrupt tasks not for light-weight ISR
+//       handles heavy interrupt tasks for light-weight ISR that doesnot
 using Callback = void(*)(float);
 
 Callback on_temp_ready = nullptr;
@@ -490,38 +373,20 @@ int main() {
   - `USART` = Universal Synchrounous / Asynchronous Receiver/Transmitter
 - `RX` / `TX` = Receiver pin / Transmitter pin
 
-TX ──────────────────── RX    (point-to-point, 2 wires)
+TX ──────────────────── RX
+&
 RX ──────────────────── TX
 
-- w/o clock wire both side agrees on
+- `w/o clock wire` both side agrees on
   - `baud rate`, `frame format`, `voltage level`
-  - Frame: [START][D0][D1]...[D7][PARITY?][STOP]
-  - voltage: TTL/RS-232/RS-485 transceiver level
-
-```cpp
-// UART register-level init (STM32) at MCU
-void uart_init(uint32_t baud) {
-    RCC->APB1ENR |= RCC_APB1ENR_USART2EN;        // clock gate on
-    USART2->BRR = SystemCoreClock / baud;          // baud rate divider
-    USART2->CR1 = USART_CR1_TE | USART_CR1_RE    // enable TX + RX
-                | USART_CR1_RXNEIE               // RX interrupt enable
-                | USART_CR1_UE;                  // UART enable
-    NVIC_EnableIRQ(USART2_IRQn);                  // enable in NVIC
-}
-
-void USART2_IRQHandler() {
-    if (USART2->SR & USART_SR_RXNE) {
-        uint8_t byte = USART2->DR;  // read clears RXNE flag
-        rx_ring.push(byte);
-    }
-}
-```
+  - `Frame`: [START][D0][D1]...[D7][PARITY?][STOP]
+  - `voltage`: TTL/RS-232/RS-485 transceiver level
 
 ### SPI (Serial Peripheral Interface)
 
-```
-Master-slave, synchronous, full-duplex:
+Master-slave, synchronous, full-duplex
 
+```
       Master         Slave
   ┌───────────┐  ┌───────────┐
   │   MOSI ───┼──┼→ MOSI     │  (Master Out Slave In)
@@ -529,26 +394,15 @@ Master-slave, synchronous, full-duplex:
   │   SCLK ───┼──┼→ SCLK     │  (Clock — master drives)
   │   CS   ───┼──┼→ CS       │  (Chip Select — active low)
   └───────────┘  └───────────┘
+```
 
 - Master drives clock → no baud rate agreement needed
-- Full duplex: sends and receives simultaneously (shift register)
+- Full duplex: sends and receives simultaneously by shift register
 - No addressing: CS pin selects which slave is active
-- Speeds: typically 1-50 MHz (much faster than I2C/UART)
+- Speeds: typically 1-50 MHz (much faster than `I2C/UART`)
 - Multiple slaves: one CS pin per slave, only one active at a time
-```
 
 **Semi use:** ADC reading (16-bit at 1 MHz = 16µs per sample), DAC output, FPGA communication, flash memory (recipe/log storage)
-
-```cpp
-// SPI transaction pattern
-uint16_t spi_read_adc() {
-    CS_LOW();                          // select slave
-    uint8_t hi = spi_transfer(0x00);   // clock out dummy, clock in data
-    uint8_t lo = spi_transfer(0x00);
-    CS_HIGH();                         // deselect
-    return (hi << 8) | lo;
-}
-```
 
 ### I2C (Inter-Integrated Circuit)
 
@@ -562,73 +416,61 @@ Multi-device bus, 2 wires with pull-up resistors:
   SCL ────┬──┬──┬───  (clock — master drives)
            │  │  │
          [M] [S1][S2]  (master + multiple slaves on same 2 wires)
+```
 
-- Each slave has a 7-bit address (set by hardware pins or fixed)
-- Master initiates all communication (slave can't talk unprompted)
-- ACK/NACK after every byte (slave pulls SDA low = ACK)
+- Synchronous by a shared clock
+- `Address-based` Each slave has a 7-bit address (set by hardware pins or fixed)
+- Master initiates all communication so slave can't talk unprompted
+- ACK/NACK after every byte
 - Bus speed: 100 kHz (standard), 400 kHz (fast), 1 MHz (fast+)
-```
-
-**I2C transaction protocol:**
-```
-START → [7-bit addr + R/W bit] → ACK → [data byte] → ACK → ... → STOP
-
-Write to slave 0x48:  S | 0x48<<1|0 | ACK | reg_addr | ACK | data | ACK | P
-Read from slave 0x48: S | 0x48<<1|0 | ACK | reg_addr | ACK | Sr | 0x48<<1|1 | ACK | data | NACK | P
-
-S = Start condition (SDA falls while SCL high)
-P = Stop condition (SDA rises while SCL high)
-Sr = Repeated start (avoids releasing bus between write and read)
-```
-
-**Bus recovery (9-clock trick):**
-```
-Problem: slave stuck holding SDA low (crashed mid-byte, won't release)
-Solution: master clocks SCL 9 times — slave will eventually release SDA after
-          it thinks it has sent all remaining bits
-Then: master issues STOP condition to reset bus state
-```
 
 **Semi use:** Temperature sensors (LM75, TMP117), EEPROMs (AT24C), humidity sensors, small displays (OLED)
 
 ### CAN (Controller Area Network)
 
+differential pair for robustness
+hardware arbitration:
 ```
-Broadcast bus, differential pair, hardware arbitration:
+ CAN_H ─────┬──────┬──────┬──────┐
+ CAN_L ─────┬──────┬──────┬──────┐
+            │      │      │      │
+        [Node A][Node B][Node C][120Ω]  ← termination resistors at both ends
+```
 
-  CAN_H ─────┬──────┬──────┬──────┐
-  CAN_L ─────┬──────┬──────┬──────┐
-              │      │      │      │
-          [Node A][Node B][Node C][120Ω]  ← termination resistors at both ends
-
-- Message-based (not address-based): any node can send any message ID
-- All nodes see all messages — filter in hardware by ID
+- `Message-based`, nodes put message to `broadcast bus` and interested node will pick
 - Priority: lowest message ID wins bus arbitration (bit-dominant = 0)
-  ID 0x100 beats ID 0x200 automatically, no collision
-```
+  - ID 0x100 beats ID 0x200 automatically, no collision
 
-**CAN frame:**
+**CAN message frame:**
 ```
 ┌─────┬──────────┬─────┬────────────────────┬─────┬─────┬───┐
-│ SOF │ ID (11b) │ RTR │ Data (0-8 bytes)    │ CRC │ ACK │EOF│
+│ SOF │ ID (11b) │ RTR │ Data (0-8 bytes)   │ CRC │ ACK │EOF│
 └─────┴──────────┴─────┴────────────────────┴─────┴─────┴───┘
-
 ```
 
-- SOF: Start of Frame (dominant bit)
-- ID: Message identifier (11-bit standard, 29-bit extended)
-- RTR: Remote Transmission Request (request data from another node)
-- CRC: 15-bit CRC computed by hardware
-- ACK: All receivers acknowledge (pull bus dominant)
-
-| Feature | CAN 2.0 | CAN-FD |
-|---|---|---|
-| Data length | 0-8 bytes | 0-64 bytes |
-| Data rate | up to 1 Mbps | up to 8 Mbps (data phase) |
-| Arbitration | 11/29-bit ID | Same |
-| Semi use | Motor control, valve control | High-speed sensor data |
+- `SOF` Start of Frame (dominant bit)
+- `ID` Message identifier (11-bit standard, 29-bit extended)
+- `RTR` Remote Transmission Request (request data from another node)
+- `CRC` 15-bit CRC computed by hardware
+- `ACK` All receivers acknowledge (pull bus dominant)
 
 **Semi use:** Multi-axis motor controllers, gas panel valve sequencing, smaller tools without Ethernet
+
+
+### EtherCAT (Ethernet for Control Automation Technology)
+
+Daisy-chain topology, deterministic, `processing on the fly`
+```
+  Master → [Slave 1] → [Slave 2] → [Slave 3] → ... → back to Master
+              ↕             ↕             ↕
+           [Drive]       [I/O]        [Sensor]
+
+```
+- Standard Ethernet frame from `master` passes through each `slave`
+- Timing for slaves are predictable -> good for control
+- IN contrast `star` style switch introduce jitter time
+
+**Semi use:** ASML wafer stage (synchronized multi-axis motion at nm precision), high-speed motion control, real-time I/O
 
 ### USB (Universal Serial Bus)
 
@@ -648,26 +490,9 @@ Host-device centric topology (NOT peer-to-peer):
 
 **Semi use:** Equipment Controller ↔ PC data transfer, firmware update via DFU, virtual COM port for debug
 
-### EtherCAT (Ethernet for Control Automation Technology)
-
-```
-Daisy-chain topology, deterministic, "processing on the fly":
-
-  Master → [Slave 1] → [Slave 2] → [Slave 3] → ... → back to Master
-              ↕             ↕             ↕
-           [Drive]       [I/O]        [Sensor]
-
-```
-- Standard Ethernet frame passes through each slave
-- Timing for slaves are predictable -> good for control
-- IN contrast `star` style switch introduce jitter time
-
-**Semi use:** ASML wafer stage (synchronized multi-axis motion at nm precision), high-speed motion control, real-time I/O
-
 ### Analog I/O (ADC / DAC)
 
-ADC (Analog to Digital Converter):
-DAC (Digital to Analog Converter):
+ADC (Analog to Digital Converter) <-> DAC (Digital to Analog Converter)
 
 ### Bus Comparison Table
 
@@ -676,30 +501,8 @@ DAC (Digital to Analog Converter):
 `SPI` is fast and deterministic for short board-level links as `no-addressing`
 `I2C` is low-pin-count and good for many low-speed peripherals.
 `CAN` is robust multi-node messaging with built-in arbitration and fault handling.
-`USB` is host-centric and high throughput for peripherals.
 `EtherCAT` is deterministic industrial Ethernet for synchronized motion/control.
-
-### Choosing a bus for semi equipment
-
-```
-Decision tree:
-                        Need >1 Mbps?
-                       /              \
-                     YES               NO
-                    /                    \
-          Need determinism?          How many devices?
-           /          \               /          \
-         YES          NO            1-2          3+
-          │            │             │            │
-       EtherCAT      USB/Eth       UART       I2C or CAN
-          │                          │            │
-    (motion ctrl)              (debug,         (sensors,
-                                host link)     motor ctrl)
-                    
-    Need speed + no addressing? → SPI (ADC/DAC, FPGA)
-    Need long distance? → RS-485
-    Need broadcast + priority? → CAN
-```
+`USB` is host-centric and high throughput for peripherals.
 
 ---
 
@@ -754,13 +557,13 @@ Kernel tick ISR (SysTick, every 1ms):
 
 **Context switch cost:** ~10µs on Cortex-M4 at 168 MHz (save/restore ~32 registers)
 
-**Key primitives:**
+**Synchronization primitives:**
+
 | Primitive | Purpose | Typical use |
 |---|---|---|
 | **Task** | Independent thread with own stack + priority | Each subsystem = 1 task |
-| **Mutex** | Mutual exclusion (one owner at a time) | Protect shared hardware (SPI bus) |
-| **Semaphore** | Counting signal (producer/consumer) | ISR signals task "data ready" |
-| **Queue** | Thread-safe FIFO between tasks | Sensor data → control task |
+| **Mutex** | Mutual lock exclusion (one owner at a time) | Protect shared hardware (SPI bus) |
+| **Semaphore** | Counting signal (producer/consumer) | ISR -> task "data ready" |
 | **Event flags** | Bitfield of conditions (wait for any/all) | Multiple ready signals |
 | **Timer** | Software timer (calls callback after delay) | Timeout, periodic actions |
 
@@ -1013,24 +816,17 @@ Semi use: field firmware update without opening tool, automatic rollback on fail
 
 ## 5. Semi Equipment Architecture (4-Layer Stack)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Factory MES (Manufacturing Execution System)                │
-│  SECS/GEM protocol over TCP/HSMS                            │
-├─────────────────────────────────────────────────────────────┤
-│  Equipment Controller (Windows/Linux, Full OS)               │
-│  Recipe engine, GUI, data collection, SECS/GEM driver        │
-│  Communication: Ethernet TCP/UDP, PCIe, reflective memory    │
-├─────────────────────────────────────────────────────────────┤
-│  Real-Time Controller (VxWorks/QNX/RT-Linux, RTOS)           │
-│  Chamber control, task scheduling, safety interlocks         │
-│  Communication: SPI, I2C, UART, CAN to sensors below        │
-├─────────────────────────────────────────────────────────────┤
-│  Sensor/Actuator MCUs (Bare metal, No-OS)                    │
-│  Single-function: ADC→SPI, PID→PWM, I2C sensor read         │
-│  Communication: SPI/I2C/UART up to RTOS controller           │
-└─────────────────────────────────────────────────────────────┘
-```
+- Factory MES (Manufacturing Execution System)               
+  - SECS/GEM protocol over TCP/HSMS                          
+- Equipment Controller (Windows/Linux, Full OS)              
+  - Recipe engine, GUI, data collection, SECS/GEM driver     
+  - Communication: Ethernet TCP/UDP, PCIe, reflective memory 
+- Real-Time Controller (VxWorks/QNX/RT-Linux, RTOS)          
+  - Chamber control, task scheduling, safety interlocks      
+  - Communication: SPI, I2C, UART, CAN to sensors below      
+- Sensor/Actuator MCUs (Bare metal, No-OS)                   
+  - Single-function: ADC→SPI, PID→PWM, I2C sensor read       
+  - Communication: SPI/I2C/UART up to RTOS controller        
 
 **Bus usage per layer boundary:**
 | Boundary | Buses used | Why |

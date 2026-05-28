@@ -1,26 +1,5 @@
 # Embedded System Design Patterns
 
-> Software patterns for structuring embedded code.
-> For hardware fundamentals (CPU registers, buses, system layers), see [embeded-system-hw.md](embeded-system-hw.md).
-
----
-
-## System Context & Troubleshooting
-
-### Troubleshooting Categorized by Layer Interaction
-
-> Architecture overview and bus details → [embeded-system-hw.md § 5](embeded-system-hw.md#5-semi-equipment-architecture-4-layer-stack)
-
-```
-┌──────────────────────────────────────────────────────┐
-│              Full OS (Equipment Controller)            │
-├──────────────────────────────────────────────────────┤
-│              RTOS (Chamber Controllers)               │
-├──────────────────────────────────────────────────────┤
-│              No-OS (Sensor/Actuator MCUs)             │
-└──────────────────────────────────────────────────────┘
-```
-
 #### No-OS internal (single MCU bugs)
 
 | # | Problem | Root cause | Debug method |
@@ -178,65 +157,22 @@ int main() {
 }
 ```
 
-**Why >3 tasks breaks a super-loop:**
-
-The cycle period is dictated by the fastest task. All tasks must complete within that period:
-
-```
-Tasks:  A=1kHz(1ms)  B=100Hz(10ms)  C=10Hz(100ms)  D=1Hz(1s)
-
-Super-loop cycle MUST be ≤ 1ms (fastest task dictates):
-┌─────────────────────────────────────────┐
-│ A(200µs) │ B(300µs) │ C(400µs) │ D(?)  │ ← 900µs used, 100µs left
-└─────────────────────────────────────────┘
-                                     ^ D can't fit → deadline miss
-```
-
-| # Tasks | Problem |
-|---|---|
-| 1-2 | Fine — both fit in cycle budget |
-| 3 | Tight — sum of WCETs approaches cycle time, jitter appears |
-| 4+ | **Deadline miss** — can't fit all in fastest period |
-| Mixed rates | Waste — running 1Hz task every 1ms = 999 no-op checks |
-
-**What you graduate to:**
-
-| Scheduler | Solves |
-|---|---|
-| Cooperative (time-triggered) | Only runs tasks when due — no wasted checks. Still no preemption |
-| Preemptive (RTOS) | Fastest task **interrupts** slower ones mid-execution → always meets deadline |
-
-```
-Preemptive timeline:
-──────────────────────────────────────────────
-A ▓▓▓   ▓▓▓   ▓▓▓   ▓▓▓   (every 1ms, highest prio, always runs)
-B    ▓▓▓▓       ▓▓▓▓        (every 10ms, preempted by A)
-C         ░░▓▓░░▓▓░░░        (every 100ms, preempted by A & B)
-D                        ▓▓▓ (every 1s, lowest priority)
-──────────────────────────────────────────────
-```
-
-Super-loop = equal time-sharing. Real systems have **unequal deadlines** → preemption lets critical tasks always win.
-
 ### 5. Interrupt / ISR Pattern
-
-Register a short function that hardware invokes when an event occurs (pin change, timer tick, UART byte received).
-ISR must execute quickly — Avoid allocations, I/O, or long computation inside ISRs.
-use `volatile sig_atomic_t running=1;`
-On POSIX systems (macOS simulation), model interrupts using `signal()` or `timer_create()` with `SIGALRM`. 
-mishandling ISR/main boundary causes race conditions and data corruption.
-
 ### 6. Interrupt → Deferred Work
 
-Keep ISR execution under ~1μs by deferring heavy processing to the main loop like event loop.
+- Register a short function that hw invokes when an event occurs (pin change, timer tick, UART byte received).
+- ISR must execute quickly — Avoid allocations, I/O, or long computation inside ISRs. -> hardwork deferred to SW callback
+- use `volatile sig_atomic_t running=1;`
+- On POSIX systems (macOS simulation), model interrupts using `signal()` or `timer_create()` with `SIGALRM`. 
+- `mishandling` ISR/main boundary causes race conditions and data corruption.
 
 ### 7. Cooperative Scheduler
 
-An array of task descriptors, each with a function pointer, period, and last-run timestamp. The scheduler loop iterates all tasks, running each one whose period has elapsed. Tasks must not block — they run a slice and return.
-No preemption, no stack-per-task, minimal RAM. Task priorities are implicit in array order (earlier tasks run first when multiple are due). Add a `max_runtime` field and assert if any task overruns its budget. Simpler than an RTOS but sufficient for many real embedded products.
+check one-by-one if `last_run > period_ms`
 
 ```cpp
 struct Task {
+    // function pointer named `run`
     void (*run)();
     uint32_t period_ms;
     uint32_t last_run;
@@ -264,35 +200,12 @@ void scheduler() {
 
 ### 8. Preemptive Scheduler (RTOS)
 
-Each task gets its own stack and priority.
-The kernel's tick ISR checks if a higher-priority task became ready and performs a context switch — saving/restoring registers and stack pointers.
-On macOS, simulate with `pthreads` and priority scheduling.
-Real RTOS (FreeRTOS, Zephyr) provides `xTaskCreate()`, mutexes, semaphores, and queues.
-The key design skill is choosing priorities and avoiding priority inversion (use priority inheritance mutexes). Overusing preemption causes hard-to-debug race conditions — prefer cooperative designs when timing permits.
-
-```cpp
-// Simulating RTOS tasks with pthreads on macOS
-void* sensor_task(void*) {
-    while (true) {
-        auto reading = adc.read();
-        xQueueSend(sensor_queue, &reading);  // FreeRTOS API
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-}
-
-void* control_task(void*) {
-    while (true) {
-        SensorData data;
-        xQueueReceive(sensor_queue, &data, portMAX_DELAY);
-        pid.compute(data.value);
-        actuator.write(pid.output());
-    }
-}
-```
+Interrupt in preemption can casue race condition or unrecoverable corrupted
 
 ### 9. Rate Monotonic Scheduling
 
-A mathematical framework for assigning priorities: the task with the shortest period gets the highest priority. If total CPU utilization stays below ~69% (for N tasks, bound is N(2^(1/N)-1)), all deadlines are guaranteed met. Calculate worst-case execution time (WCET) for each task and verify schedulability before deployment. This is used in safety-critical systems (automotive, aerospace). On macOS, simulate by running pthreads at different intervals and measuring whether deadlines are missed using high-resolution timers.
+the task with the shortest period gets the highest priority.
+CPU utilization and calculate `wcet_us`
 
 ```cpp
 // RMS: shortest period = highest priority
@@ -376,51 +289,11 @@ void dispatch(Event e) {
 }
 ```
 
-### 12. Hierarchical State Machine (HSM)
-
-States can contain substates.
-A parent state defines default behavior;
-child states override specific events.
-Unhandled events propagate up to the parent — like virtual method dispatch in OOP.
-Example: a `RUNNING` parent state handles `EMERGENCY_STOP` for all children (`RAMP_UP`, `HOLD`, `RAMP_DOWN`).
-Reduces duplication when multiple states share transitions.
-Implement with a `parent` pointer per state or using Miro Samek's QP framework pattern.
-Entry/exit actions fire when transitioning across hierarchy levels.
-
-```cpp
-struct HsmState {
-    const char* name;
-    HsmState* parent;
-    void (*on_enter)();
-    void (*on_exit)();
-    HsmState* (*handle)(Event e);  // returns parent if unhandled
-};
-
-HsmState* hsm_dispatch(HsmState* current, Event e) {
-    HsmState* s = current;
-    while (s) {
-        HsmState* next = s->handle(e);
-        if (next != s->parent) {  // event was handled
-            if (next != current) {
-                current->on_exit();
-                next->on_enter();
-            }
-            return next;
-        }
-        s = s->parent;  // propagate to parent
-    }
-    return current;  // unhandled
-}
-```
-
 ### 13. State Pattern (OOP)
 
-Each state is a class implementing a common `IState` interface with `enter()`, `execute()`, `exit()` methods.
-The context object holds a pointer to the current state and delegates calls.
-Transitions replace the pointer.
+A base `IState` interface with `enter()`, `execute()`, `exit()` methods.
 This separates per-state logic into dedicated classes, each testable in isolation.
 Downside: heap allocation or a static pool is needed for state objects, and the indirection can be too heavy for small MCUs.
-Best suited for larger embedded systems (Linux-based, Cortex-A) where RAM and code size are less constrained.
 
 ```cpp
 class IState {

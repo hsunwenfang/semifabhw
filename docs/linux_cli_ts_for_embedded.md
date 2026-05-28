@@ -1,6 +1,29 @@
 
 # Linux Concepts
 
+## Kernel / CPU / build
+
+- these info relates to Device Tree and driver behavior
+```sh
+uname -r: exact kernel release, used for module path matching (/lib/modules/<release>)
+uname -m: CPU architecture (x86_64, aarch64, armv7l), useful for binary/driver compatibility
+uname -a: full snapshot (kernel, host, build info)
+```
+
+app crashes -> CPU fault -> kernel sends `SIGSEGV`
+-> kernel checks core_pattern -> kernel pipes dump to systemd-coredump
+-> systemd-coredump stores core + metadata
+-> coredumpctl queries journal/storage -> coredumpctl gdb opens matching core in gdb
+
+### DebugFS
+
+expose internal kernel and driver state for diagnosis beyond
+`journalctl -k` and `coredumpctl`
+```sh
+ls /sys/kernel/debug
+sudo vim /sys/kernel/debug/tracing/README
+```
+
 ## Paths and Mount Backing
 
 - `/proc`, `/sys`: Virtual fs allocated by kernel to RAM at runtime
@@ -31,7 +54,7 @@
 
 - check device id mapping
 ```sh
-ls -l /dev/disk
+ls -l /dev/disk ## different view
 total 0
 drwxr-xr-x 3 root root 140 May 27 05:03 azure
 drwxr-xr-x 2 root root 340 May 27 05:03 by-id
@@ -39,74 +62,148 @@ drwxr-xr-x 2 root root  80 May 27 05:03 by-label
 drwxr-xr-x 2 root root 100 May 27 05:03 by-partuuid
 drwxr-xr-x 2 root root 140 May 27 05:03 by-path
 drwxr-xr-x 2 root root  80 May 27 05:03 by-uuid
+# check 
+findmnt -no UUID,SOURCE,PARTUUID /
+85a32921-52b7-4d2d-9c02-a565b70bc919 /dev/nvme0n1p1 fb505a37-7427-4a67-b014-dcfeb6c00245
+# really checking the statistics
+stat /dev/disk 
+  File: /dev/disk
+  Size: 160             Blocks: 0          IO Block: 4096   directory
+Device: 5h/5d   Inode: 232         Links: 8
+Access: (0755/drwxr-xr-x)  Uid: (    0/    root)   Gid: (    0/    root)
+Access: 2026-05-28 02:08:51.682033116 +0000
+Modify: 2026-05-28 02:08:51.782033110 +0000
+Change: 2026-05-28 02:08:51.782033110 +0000
+ Birth: 2026-05-28 02:08:51.682033116 +0000
 ###
 /dev/disk/by-uuid/85a32921-52b7-4d2d-9c02-a565b70bc919 -> ../../nvme0n1p1
+readlink -f # resolves through the end of link chain
+### check the mount options
+sudo mount | grep /dev/nvme0n1
+/dev/nvme0n1p1 on / type ext4 (rw,relatime,discard,errors=remount-ro)
+/dev/nvme0n1p15 on /boot/efi type vfat (rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro)
+# filesystem table -> what to mount right after boot
+/etc/fstab
+UUID=85a32921-52b7-4d2d-9c02-a565b70bc919 / ext4   discard,errors=remount-ro  0 1
 ```
 
-### Relevant TS Guide
+```sh
+# also output blkid
+sudo blkid
+/dev/nvme0n1p1: LABEL="cloudimg-rootfs" UUID="85a32921-52b7-4d2d-9c02-a565b70bc919" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="fb505a37-7427-4a67-b014-dcfeb6c00245"
+/dev/nvme0n1p15: LABEL_FATBOOT="UEFI" LABEL="UEFI" UUID="EBD8-3689" BLOCK_SIZE="512" TYPE="vfat" PARTUUID="de2daaf2-b55f-4aca-ac16-18549ec4eceb"
+/dev/loop1: TYPE="squashfs"
+/dev/loop4: TYPE="squashfs"
+# ....
+/dev/nvme0n1p14: PARTUUID="c92e0d1b-d7ec-4a3b-8da2-2597e81e4eef"
+```
 
-#### TS 2: Root filesystem mounted read-only unexpectedly
+### Firmware update package checksum mismatch
 
-    - Confirm current mount flags and check configured mount policy to find why writes are blocked.
-    - `mount`
-        - `source` on `target` type `fstype` (options)
-        - /dev/nvme0n1p1 on / type ext4 (rw,relatime,discard,errors=remount-ro)
-        - devtmpfs on /dev type devtmpfs (rw,nosuid,noexec,relatime,size=16428884k,nr_inodes=4107221,mode=755,inode64)
-    - `/proc/mounts`
-    - `/etc/fstab` : filesystem table -> what to mount right after boot
-        - UUID=85a32921-52b7-4d2d-9c02-a565b70bc919 / ext4   discard,errors=remount-ro  0 1
-        - uuid to device name
+Description: Verify downloaded artifact integrity before flashing to prevent bricking or partial updates.
+- Linux command(s): `sha256sum firmware.bin`
+- FS path(s): `/tmp/`, `/opt/firmware/`
+- Linux concept: Integrity verification
 
-#### TS 9: PWM output absent on pin
+#### Check mount and fstab
 
-    - Export channel and verify period/duty/enable sequencing to ensure PWM (Pulse Width Modulation) is actually active.
-    `cat /sys/class/pwm/pwmchip0/export`
-    `echo 0 > /sys/class/pwm/pwmchip0/export` export control file so pwmchip0 can be controlled
-    - `timing` `pin configuration` `state management`
+Value in /proc/cmdline does not exist in blkid output
+Broken symlink under /dev/disk/by-uuid or /dev/disk/by-partuuid
+Root mounted from unexpected device
+Boot falls into emergency shell or mounts root read-only
 
-#### TS 22: Flash storage almost full
+#### Check diskIO
 
-    - Measure filesystem and directory usage to prioitize cleanup or log-rotation fixes.
-    - mount or findmnt: what is mounted, where, and with which type/options
-    df -h: how much real filesystem space is used/available
-    - FS path(s): `/var/`, `/tmp/`, `/home/`
-    - Linux concept: Capacity and disk usage
-
-#### TS 23: eMMC/SD card I/O errors appear
-
-    - Description: Inspect kernel storage errors and health indicators to assess media degradation.
-    - Linux command(s): `dmesg | grep -i -E "mmc|I/O error"`, `smartctl -a /dev/mmcblk0`
-    - FS path(s): `/dev/mmcblk*`, `/sys/block/mmcblk0/`
-    - Linux concept: Block device health
-
-#### TS 24: Read/write performance is too low
-
-    - Description: Collect latency and throughput metrics to distinguish queueing, media, and workload bottlenecks.
-    - Linux command(s): `iostat -x 1`, `fio --name=randrw ...`
-    - FS path(s): `/sys/block/`, `/proc/diskstats`
-    - Linux concept: I/O throughput and latency
+Collect latency and throughput metrics to distinguish queueing, media, and workload bottlenecks.
+`iostat -x 1`, `fio --name=randrw ...`
+- FS path(s): `/sys/block/`, `/proc/diskstats`
+- Linux concept: I/O throughput and latency
 
 ## Systemd Namespaces and Units
 
-- `systemd` as `PID 1` manages units (`.service`, `.socket`, `.mount`, `.target`, and others).
-- Strongest control is through `cgroup v2` for process lifecycle and resource control.
-- Namespace behavior:
-  - `systemd` can apply per-unit namespace isolation (mount, IPC, PID, network, user, UTS).
-  - It does not globally "own" namespaces; kernel provides namespaces, systemd configures usage per unit.
+- systemd
+This is the main service manager and init system with PID==1. Parent of most processes.
+- systemd-coredump
+started and generate coredump file only when unit crash. `coredumpctl` for debug later.
+A unit is considered crashed and enters the `failed` state if its main process terminates abnormally: with a non-zero exit code, an unhandled signal (e.g., SIGSEGV), or a timeout.
+- journalctl
+records kernel `-k`, boot `-b`, and unit logs
 
-- Useful checks:
-  - `ps -p 1 -o pid,comm,args`
-  - `systemctl status`
-  - `systemd-cgls`
-  - `systemctl show <unit> | grep -E "Namespace|Private|Protect"`
-  - `lsns`
+### Enablement
+- If the unit starts and boot
+- `systemctl enable / disable / is-enable myapp.service` 
 
-### Relevant TS Guide
+### Activation
+- start / stop the unit right now
+- `systemctl start / stop / status myapp.service` 
 
-#### TS 15: Process crashes intermittently
-#### TS 16: High CPU usage causes missed control loop deadlines
-#### TS 19: Service does not start at boot
-#### TS 20: Need startup order dependency fix
+### Status
+- `running` `exited` `reloading` `failed`
+- `systemctl reset-failed my-unit.service` -> `inactive`
+
+### Units
+`.service`, `.socket`, `.mount`, `.target`
+
+### CgroupV2
+
+Controls what a process can `USE`
+```sh
+sudo systemd-cgls
+Control group /:
+-.slice
+├─user.slice 
+│ └─user-1000.slice 
+│   ├─user@1000.service …
+│   │ ├─user.slice 
+│   │ │ └─podman-pause-9141885347830502205.scope 
+│   │ │   └─3199 /usr/bin/podman
+│   │ ├─app.slice 
+│   │ │ └─dbus.service 
+│   │ │   └─3419 /usr/bin/dbus-daemon --session --address=systemd>
+```
+- `v2` redesigns over `v1` as resources `cpu` `io` `mem` can only be at leaf process
+- for units `.service` `.scope` sytemd creates a cgroup
+- cgroup tree enables kill all offsprings when a node is killed
+- Can pass resource managment flag like `CPUWeight` at unit files
+
+### Namespace
+
+Controls what a process can `SEE`
+
+- `systemd` can apply per-unit namespace isolation (mount, IPC, PID, network, user, UTS).
+- It does not globally "own" namespaces; kernel provides namespaces, systemd configures usage per unit.
+- `systemctl show <unit> | grep -E "Namespace|Private|Protect"`
+```sh
+sudo lsns
+        NS TYPE   NPROCS   PID USER            COMMAND
+4026531834 time      162     1 root            /sbin/init
+4026531835 cgroup    162     1 root            /sbin/init
+4026531836 pid       162     1 root            /sbin/init
+4026531837 user      161     1 root            /sbin/init
+4026531838 uts       158     1 root            /sbin/init
+4026531839 ipc       162     1 root            /sbin/init
+4026531840 net       162     1 root            /sbin/init
+```
+
+#### Process crashes
+
+Correlate service logs with core dump records to identify recurring crash signatures.
+`journalctl -u app.service -n 200`, `coredumpctl list`
+`/var/log/journal/`, `/var/lib/systemd/coredump/`
+- coredump will not start until some failure
+
+#### High CPU usage causes missed control loop deadlines
+
+Find top CPU consumers and scheduling priorities to diagnose realtime jitter and starvation.
+`top`, `ps -eo pid,comm,rtprio,ni,%cpu --sort=-%cpu`
+`rtprio` is the real-time priority (1-99). Higher numbers are higher priority. A value of `50` is a common default for `SCHED_RR` or `SCHED_FIFO` policies, while `99` is the maximum. A `-` or `0` indicates the process is using the normal `SCHED_OTHER` scheduler, not a real-time one.
+`/proc/`, `/sys/fs/cgroup/`
+
+#### Need startup order dependency fix
+
+Inspect merged unit files and dependency tree to enforce correct sequencing.
+`systemctl cat app.service`, `systemctl list-dependencies`
+`/etc/systemd/system/*.service`
 
 ## Boot Porcess
 
@@ -114,7 +211,7 @@ drwxr-xr-x 2 root root  80 May 27 05:03 by-uuid
     - Hardware reset path enters ROM, then first/second stage loader.
 2. Bootloader phase
     - Bootloader (for example U-Boot) initializes minimum hardware, loads `kernel`, `DTB`, and optional `initramfs`.
-    - `DTB` (Device Tree Blob) describes board hardware (CPU, RAM, buses, IRQ, devices).
+    - `DTB` (Device Tree Blob) describes board hardware like CPU, RAM, buses, IRQ, devices.
     - `initramfs` is an early userspace filesystem in RAM for preparation tasks.
     - Bootloader sets bootargs and jumps to kernel entry.
 3. Init phase (kernel early init)
@@ -127,14 +224,6 @@ drwxr-xr-x 2 root root  80 May 27 05:03 by-uuid
     - Common issues: wrong `root=`/`rootfstype=`, bad `fstab` options, missing device, read-only fallback.
 6. Userspace handoff phase
     - Kernel executes `PID 1` (`systemd`/`init`/`busybox init`) and userspace startup begins.
-    - Services are managed by `systemctl` only when `systemd` is PID 1; applications may also be launched by scripts or other supervisors.
-
-flash/disk stores program image
-boot or exec loads needed parts into RAM
-CPU executes from RAM, not directly from regular filesystem files
-
-- Does handoff mean PC pointer change?
-  - Yes. Control flow jumps to the next entry point (program counter changes) and includes full context setup (memory mappings, arguments, privilege/domain context).
 
 - Useful checks by stage:
   - Boot args: `cat /proc/cmdline`
@@ -143,9 +232,7 @@ CPU executes from RAM, not directly from regular filesystem files
   - PID 1 identity: `cat /proc/1/comm`
   - Early userspace status: `systemctl --failed`
 
-### Relevant TS Guide
-
-#### TS 1: Device does not boot past kernel logo
+### Device does not boot past kernel logo
 
 Check kernel ring buffer to identify where boot stops (bootloader handoff, init, probe, mount, or userspace start).
 
@@ -155,7 +242,7 @@ cat /proc/cmdline # shows the boot argument while
 cat /var/log # may be empty if userspace passing is incomplete
 ```
 
-#### TS 3: Application binary fails with "No such file or directory"
+### Application binary fails with "No such file or directory"
 
 Verify binary architecture and dynamic linker dependencies
 this error often indicates missing loader/lib, not missing file.
@@ -180,24 +267,75 @@ libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x0000744cc2d10000)
 
 ```
 
-#### TS 5: USB sensor not detected
-#### TS 6: I2C peripheral not responding
-#### TS 7: SPI device communication mismatch
-#### TS 10: Network interface is down after boot
-#### TS 11: Embedded board cannot get IP via DHCP
-#### TS 12: DNS resolution fails but ping by IP works
-#### TS 13: NTP time sync not working
-#### TS 14: RTC time drifts after power cycle
-#### TS 18: Out-of-memory kills critical process
-#### TS 25: Kernel module not loaded for peripheral
-#### TS 26: Device-tree change not taking effect
+### USB / I2C /SPI sensor not detected
+
+Check bus enumeration and kernel probe messages to confirm whether the device is electrically visible and driver-bound.
+`lsusb`, `dmesg | grep -i usb`
+`/sys/bus/usb/devices/` `/sys/bus/i2c/devices/` `/sys/bus/spi/devices/`
+
+### Network interface is down after boot
+
+Check link state and manually bring interface up to differentiate config issue from driver or PHY issue.
+`ip link show`, `ip link set eth0 up` `ip netns help`
+The `ip link` command operates at Layer 2 (Data Link). It manages network interface devices themselves (MAC addresses, state up/down), not higher-level protocols like IP (Layer 3) or TCP/UDP (Layer 4).
+`/sys/class/net/`, `/etc/network/` 
+
+### Embedded board cannot get IP via DHCP
+
+Run DHCP client in verbose mode to inspect discover/offer/request/ack flow and lease failures.
+`udhcpc -i eth0 -v`, `ip addr`
+`/etc/resolv.conf`, `/var/lib/`
+A DHCP client (like `dhclient` or `systemd-networkd`) can update `/etc/resolv.conf` with the DNS server addresses provided in the DHCP lease. However, on modern systems using `systemd-resolved`, this file may just point to the local resolver stub (`nameserver 127.0.0.53`).
+
+### DNS resolution fails but ping by IP works
+
+Validate resolver configuration and query path to separate network reachability from name service problems.
+`cat /etc/resolv.conf`, `nslookup example.com`
+`/etc/resolv.conf`
+`/etc/nsswitch.conf` (Name Service Switch) defines the order for name resolution. The `hosts:` line (e.g., `hosts: files dns`) tells the system to first check `/etc/hosts` (`files`) and then query DNS servers (`dns`). It orchestrates how different sources are used.
+
+### NTP time sync not working
+
+Confirm local time service state and peer synchronization to prevent timestamp and TLS issues.
+`timedatectl status`, `ntpq -p`
+`/etc/systemd/timesyncd.conf`, `/var/lib/systemd/timesync/`
+
+### RTC time drifts after power cycle
+
+Compare hardware clock and system clock behavior across reboot to find backup-power or sync process issues.
+`hwclock -r`, `hwclock -w`
+`/dev/rtc0`, `/sys/class/rtc/rtc0/`
+- **RTC (Real-Time Clock):** A battery-backed hardware clock that keeps time even when the system is powered off.
+- **System Clock:** The main software clock kept by the kernel since boot. It's more precise but is lost on reboot.
+- **NTP (Network Time Protocol):** A protocol to synchronize the system clock with accurate time servers over the network.
+The usual flow is: RTC sets system clock at boot -> NTP corrects system clock -> system clock updates RTC on shutdown.
+RTC vs system clock
+
+
+### Kernel module not loaded for peripheral
+
+- **Device in DT:** A hardware description. The Device Tree tells the kernel "an I2C device with this name exists at this address."
+- **Kernel Module:** The driver code. It tells the kernel "I am a driver that knows how to handle devices with that name." The kernel matches the DT device to the module to bind them.
+- **Systemd Unit:** A userspace service manager file. It might depend on the hardware being ready (e.g., `After=dev-i2c-1.device`) but does not interact with the kernel driver model directly.ses expected metadata for autoloading.
+`lsmod`, `modprobe <module>`, `modinfo <module>`
+`/lib/modules/$(uname -r)/`, `/etc/modules-load.d/`
+[Q] Compare kernel mod, sytemd unit and device in DT
+
+### TS 26: Device-tree change not taking effect
+
+Verify active DT blob content and boot logs to confirm your updated DTB/overlay is actually used.
+- **`hexdump`:** A general-purpose tool to display any file's content in hexadecimal, octal, or ASCII format. It's used here to view the raw binary content of the Device Tree Blob (DTB).
+- **`coredump`:** Not a command, but a file containing a snapshot of a crashed process's memory and state. It's generated by the kernel for post-mortem debugging with tools like `gdb`./fdt`, `dmesg | grep -i dt`
+`/boot/`, `/sys/firmware/devicetree/base/`
+[Q] hexdump and coredump?
+- Linux concept: DTB loading and overlays
 
 ```sh
 cat /proc/cmdline
 BOOT_IMAGE=/boot/vmlinuz-6.8.0-1052-azure root=PARTUUID=fb505a37-7427-4a67-b014-dcfeb6c00245 ro console=tty1 console=ttyS0 earlyprintk=ttyS0 nvme_core.io_timeout=240 panic=-1
 ```
 
-## User management, permission, policy, linuxpriviledges, sudo
+## User management, permission, policy, linuxpriviledges, escalation
 
 - Subject `uid`, `gid`, `process`
 - Object `device`, `inode`
@@ -220,11 +358,6 @@ BOOT_IMAGE=/boot/vmlinuz-6.8.0-1052-azure root=PARTUUID=fb505a37-7427-4a67-b014-
 - Mount options
     `ro` blocks writes even if file permissions would allow writing.
     `noexec` blocks executing binaries from that mount even if x bit is set.
-- Privilege escalation
-    - sudo / polkit
-    - `/etc/sudoers`, `/etc/sudoers.d/`.
-    - check polkit:
-        `pkaction`
 - Device policy: `udev` assigns ownership/mode/group on device nodes under `/dev`.
     this is DAC permission setup for device-node objects (uid/gid/mode bits, and optionally ACL via udev rules).
 
@@ -234,203 +367,134 @@ BOOT_IMAGE=/boot/vmlinuz-6.8.0-1052-azure root=PARTUUID=fb505a37-7427-4a67-b014-
 - `ls -l /dev/<node>`
 - `getcap -r / 2>/dev/null | head`
 
-### Relevant TS Guide
+### Privilege escalation
 
-#### TS 27: Permission denied when accessing device node
-        - Description: Check owner/group/mode and ACLs, then confirm udev rules produce intended permissions.
-        - Linux command(s): `ls -l /dev/<node>`, `id`, `getfacl /dev/<node>`
-        - FS path(s): `/dev/`, `/etc/udev/rules.d/`
-        - Linux concept: Unix permissions and udev
+- `sudo` (command-level delegation)
+    - Runs a specific command as another user (default: root).
+    - Policy is defined in `/etc/sudoers` and `/etc/sudoers.d/`.
+    - Users authenticate as themselves, then are authorized by rule.
+    - Best for day-to-day ops because privilege is narrow and explicit.
 
-#### TS 28: Hotplug event rule not executing
-        - Description: Validate udev rule matching and execution path for add/remove events.
-        - Linux command(s): `udevadm monitor`, `udevadm test /sys/class/...`
-        - FS path(s): `/etc/udev/rules.d/`, `/run/udev/`
-        - Linux concept: udev policy and device event pipeline
+- `su -` (full identity switch)
+    - Switches to another account (often root) with a login shell environment.
+    - `-` loads target user's profile and environment (`HOME`, `PATH`, shell init files).
+    - poor auditing
 
+- `polkit` (action-based authorization for system services)
+    - Authorizes privileged actions exposed by system daemons (often over D-Bus).
+    - Common with desktop and service management workflows (for example NetworkManager, udisks, package frontends).
 
+- `sudo -l` : show allowed commands for current user.
+- `sudo -v` : refresh sudo credential timestamp.
+- `visudo -c` : syntax-check sudoers safely.
+- `journalctl _COMM=sudo` or distro auth logs: inspect sudo activity.
+- `pkaction` : list polkit actions.
+- `pkcheck --action-id <action> --process $$` : test polkit authorization for current process.
+
+- Embedded recommendation
+    - Prefer `sudo` for operational commands and automation.
+    - Keep root login tightly controlled.
+    - Use `su -` only when an interactive full root environment is truly required.
+
+### Permission denied when accessing device node
+
+Check owner/group/mode and ACLs, then confirm udev rules produce intended permissions.
+`ls -l /dev/<node>`, `id`, `getfacl /dev/<node>`
+`udev` sets the permissions (owner, group, mode) on device nodes in `/dev` when they are created. Rules in `/etc/udev/rules.d/` can match device attributes (like vendor/product ID) and specify `OWNER`, `GROUP`, and `MODE`.
+`ls -l` and `getfacl` check the final permissions on the device node, but they don't check mount options. Mount options like `ro` (read-only) are enforced by the VFS layer and override file-level permissions.
+[Q] Is mount option checked by these commands as well
+- Linux concept: Unix permissions and udev
+
+### Hotplug event rule not executing
+
+Validate udev rule matching and execution path for add/remove events.
+`udevadm monitor`, `udevadm test /sys/class/...`
+`/etc/udev/rules.d/`, `/run/udev/`
+- Linux concept: udev policy and device event pipeline
+**Hotplug** is the act of adding or removing devices while the system is running. The **udev device event pipeline** is the kernel and userspace mechanism that handles this.
+1. Kernel detects a hardware change (e.g., USB device plugged in) and creates a "uevent".
+2. `udevd` (the userspace daemon) receives the uevent.
+3. `udevd` processes its rules (`/etc/udev/rules.d/`) to match the event's properties.
+4. On a match, it performs actions like creating a device node (`/dev/sdb1`), setting permissions, and loading a driver.
+
+## Memory management
+
+### Out-of-memory kills critical process
+- `dmesg` reads the kernel's ring buffer directly. It shows kernel-level messages, is available very early in boot, but has a fixed size (older messages are overwritten).
+- `/var/log/syslog` (or `journalctl -k`) is where a logging daemon (`rsyslogd`, `journald`) saves kernel messages to persistent disk storage. It's more permanent but relies on a userspace service being active.
+- Resident Set Size (RSS) is the portion of a process's memory held in physical RAM. Other types include Virtual Memory Size (VMS) and Proportional Set Size (PSS).
+The kernel's OOM killer calculates a "badness" score for each process (`oom_score`). The score is primarily based on the percentage of memory the process is using. Processes with higher scores are killed first. The score can be adjusted via `/proc/<pid>/oom_score_adj`.led process"`
+`/proc/sys/vm/`, `/var/log/`
+[Q] diff between dmesg and /var/log/syslog
+[Q] memory type like rsmem ....
+[Q] oomkill score calculator
+
+### Memory leak suspected in long run
+
+Track resident memory trends and process mappings over time to confirm progressive growth.
+`free -m`, `cat /proc/<pid>/status`
+- **MemTotal:** Total usable RAM.
+- **MemFree:** Unused RAM.
+- **MemAvailable:** An estimate of how much memory is available for starting new applications, without swapping. It accounts for reclaimable cache and buffers.
+- **Buffers:** Memory used by kernel buffers (e.g., for block device I/O).
+- **Cached:** Memory used for the page cache (caching file contents).
+- **SReclaimable:** The part of the slab cache that can be reclaimed under memory pressure (e.g., caches for dentries and inodes).
+- **SUnreclaim:** The part of the slab cache that is not reclaimable.
+- **Shmem:** Memory used by shared memory (`tmpfs`).
+- **Active:** Memory that has been used more recently and is usually not reclaimed before Inactive memory.
+- **Inactive:** Memory that has been used less recently and is a better candidate for reclamation.
+Yes, memory leaks in C/C++ are most often caused by failing to release dynamically allocated memory (`new`, `malloc`) when it's no longer needed, often due to missing or incorrect `delete`/`free` calls in destructors or error paths.g
+[Q] Is memory leak often caused by faulty or lack-of destructor for data
 
 ## Process
 
 `ps -p 194 -o pid,ppid,user,comm,args`
 
+## Others
 
-
-# Linux CLI TS Scenarios for Embedded Systems
-
-TS = troubleshooting scenario. This list maps common embedded Linux scenarios to the command, filesystem location, and core concept you need.
-
-
-## 2) Root filesystem mounted read-only unexpectedly
-
-## 3) Application binary fails with "No such file or directory"
-
-## 4) Serial port not receiving data
+### 4) Serial port not receiving data
 
 - Description: Validate baud, parity, stop bits, and raw/canonical mode before assuming hardware failure.
 - Linux command(s): `stty -F /dev/ttyS0 -a`, `cat /dev/ttyS0`
 - FS path(s): `/dev/ttyS*`, `/sys/class/tty/`
 - Linux concept: TTY configuration
 
-## 5) USB sensor not detected
-
-- Description: Check bus enumeration and kernel probe messages to confirm whether the device is electrically visible and driver-bound.
-- Linux command(s): `lsusb`, `dmesg | grep -i usb`
-- FS path(s): `/sys/bus/usb/devices/`
-- Linux concept: USB enumeration
-
-## 6) I2C peripheral not responding
-
-- Description: Probe the bus address map and attempt register reads to isolate wiring, addressing, or power issues.
-- Linux command(s): `i2cdetect -y 1`, `i2cget -y 1 0x48`
-- FS path(s): `/dev/i2c-1`, `/sys/bus/i2c/devices/`
-- Linux concept: I2C bus probing
-
-## 7) SPI device communication mismatch
-
-- Description: Verify SPI node existence and inspect raw traffic behavior for mode/clock/chip-select mismatch clues.
-- Linux command(s): `ls /dev/spidev*`, `hexdump -C /dev/spidev0.0`
-- FS path(s): `/dev/spidev*`, `/sys/bus/spi/devices/`
-- Linux concept: SPI node and transfer validation
-
-## 8) GPIO line cannot be toggled
+### 8) GPIO line cannot be toggled
 
 - Description: Identify line ownership and direction; contention by another driver/process is a common cause.
 - Linux command(s): `gpioinfo`, `gpioset gpiochip0 17=1`
 - FS path(s): `/dev/gpiochip*`, `/sys/kernel/debug/gpio`
 - Linux concept: GPIO ownership and line state
 
-## 9) PWM output absent on pin
+### 22) Flash storage almost full
 
-## 10) Network interface is down after boot
+### 23) eMMC/SD card I/O errors appear
 
-- Description: Check link state and manually bring interface up to differentiate config issue from driver or PHY issue.
-- Linux command(s): `ip link show`, `ip link set eth0 up`
-- FS path(s): `/sys/class/net/`, `/etc/network/`
-- Linux concept: Link state management
+### 24) Read/write performance is too low
 
-## 11) Embedded board cannot get IP via DHCP
+### 25) Kernel module not loaded for peripheral
 
-- Description: Run DHCP client in verbose mode to inspect discover/offer/request/ack flow and lease failures.
-- Linux command(s): `udhcpc -i eth0 -v`, `ip addr`
-- FS path(s): `/etc/resolv.conf`, `/var/lib/`
-- Linux concept: DHCP client behavior
+### 26) Device-tree change not taking effect
 
-## 12) DNS resolution fails but ping by IP works
+### 27) Permission denied when accessing device node
 
-- Description: Validate resolver configuration and query path to separate network reachability from name service problems.
-- Linux command(s): `cat /etc/resolv.conf`, `nslookup example.com`
-- FS path(s): `/etc/resolv.conf`
-- Linux concept: Name resolution chain
-
-## 13) NTP time sync not working
-
-- Description: Confirm local time service state and peer synchronization to prevent timestamp and TLS issues.
-- Linux command(s): `timedatectl status`, `ntpq -p`
-- FS path(s): `/etc/systemd/timesyncd.conf`, `/var/lib/systemd/timesync/`
-- Linux concept: Time synchronization
-
-## 14) RTC time drifts after power cycle
-
-- Description: Compare hardware clock and system clock behavior across reboot to find backup-power or sync process issues.
-- Linux command(s): `hwclock -r`, `hwclock -w`
-- FS path(s): `/dev/rtc0`, `/sys/class/rtc/rtc0/`
-- Linux concept: RTC vs system clock
-
-## 15) Process crashes intermittently
-
-- Description: Correlate service logs with core dump records to identify recurring crash signatures.
-- Linux command(s): `journalctl -u app.service -n 200`, `coredumpctl list`
-- FS path(s): `/var/log/journal/`, `/var/lib/systemd/coredump/`
-- Linux concept: Service logs and core dumps
-
-## 16) High CPU usage causes missed control loop deadlines
-
-- Description: Find top CPU consumers and scheduling priorities to diagnose realtime jitter and starvation.
-- Linux command(s): `top`, `ps -eo pid,comm,rtprio,ni,%cpu --sort=-%cpu`
-- FS path(s): `/proc/`, `/sys/fs/cgroup/`
-- Linux concept: Scheduling and CPU profiling
-
-## 17) Memory leak suspected in long run
-
-- Description: Track resident memory trends and process mappings over time to confirm progressive growth.
-- Linux command(s): `free -m`, `cat /proc/<pid>/status`
-- FS path(s): `/proc/<pid>/smaps`, `/proc/meminfo`
-- Linux concept: Memory accounting
-
-## 18) Out-of-memory kills critical process
-
-- Description: Read kernel OOM events to identify victim process and tune memory behavior accordingly.
-- Linux command(s): `dmesg | grep -i -E "oom|killed process"`
-- FS path(s): `/proc/sys/vm/`, `/var/log/`
-- Linux concept: OOM killer behavior
-
-## 19) Service does not start at boot
-
-- Description: Verify unit status and enablement state to catch missing symlinks, bad dependencies, or runtime failures.
-- Linux command(s): `systemctl status app.service`, `systemctl is-enabled app.service`
-- FS path(s): `/etc/systemd/system/`, `/lib/systemd/system/`
-- Linux concept: systemd unit lifecycle
-
-## 20) Need startup order dependency fix
-
-- Description: Inspect merged unit files and dependency tree to enforce correct sequencing.
-- Linux command(s): `systemctl cat app.service`, `systemctl list-dependencies`
-- FS path(s): `/etc/systemd/system/*.service`
-- Linux concept: Unit dependency graph
-
-## 21) Firmware update package checksum mismatch
-
-- Description: Verify downloaded artifact integrity before flashing to prevent bricking or partial updates.
-- Linux command(s): `sha256sum firmware.bin`
-- FS path(s): `/tmp/`, `/opt/firmware/`
-- Linux concept: Integrity verification
-
-## 22) Flash storage almost full
-
-## 23) eMMC/SD card I/O errors appear
-
-## 24) Read/write performance is too low
-
-## 25) Kernel module not loaded for peripheral
-
-- Description: Check whether the module exists, is loaded, and exposes expected metadata for autoloading.
-- Linux command(s): `lsmod`, `modprobe <module>`, `modinfo <module>`
-- FS path(s): `/lib/modules/$(uname -r)/`, `/etc/modules-load.d/`
-- Linux concept: Module management
-
-## 26) Device-tree change not taking effect
-
-- Description: Verify active DT blob content and boot logs to confirm your updated DTB/overlay is actually used.
-- Linux command(s): `hexdump -C /sys/firmware/fdt`, `dmesg | grep -i dt`
-- FS path(s): `/boot/`, `/sys/firmware/devicetree/base/`
-- Linux concept: DTB loading and overlays
-
-## 27) Permission denied when accessing device node
-
-## 28) Hotplug event rule not executing
+### 28) Hotplug event rule not executing
 
 - Description: Observe live udev events and test rules to find match condition or action failures.
 - Linux command(s): `udevadm monitor`, `udevadm test /sys/class/...`
 - FS path(s): `/etc/udev/rules.d/`, `/run/udev/`
 - Linux concept: udev event pipeline
 
-## 29) Need to inspect live kernel tunables
+### 29) Need to inspect live kernel tunables
 
 - Description: Read runtime sysctl values and compare them with persisted config to verify applied tuning.
 - Linux command(s): `sysctl -a | grep <key>`, `cat /proc/sys/...`
 - FS path(s): `/proc/sys/`, `/etc/sysctl.conf`, `/etc/sysctl.d/`
 - Linux concept: Runtime kernel parameters
 
-## 30) Suspect network packet loss in field
+### 30) Suspect network packet loss in field
 
 - Description: Combine ICMP tests, NIC counters, and packet capture to localize loss on host, link, or upstream path.
 - Linux command(s): `ping -c 50 <ip>`, `ethtool -S eth0`, `tcpdump -i eth0`
 - FS path(s): `/sys/class/net/eth0/statistics/`
 - Linux concept: Link diagnostics and packet capture
-
-## Quick Usage Notes
-
-- On minimal embedded distributions, some tools may not be installed by default (for example: `iostat`, `fio`, `ethtool`, `tcpdump`).
-- If `systemd` is not used, replace `systemctl`/`journalctl` with init scripts and `/var/log/messages` style logs.
-- Prefer read-only inspection first (`cat`, `ls`, `dmesg`) before running write operations on production hardware.

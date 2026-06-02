@@ -1,5 +1,7 @@
 
-# Type System & Semantics
+
+
+# Types and Auto
 
 ## Cast
 
@@ -9,74 +11,15 @@
 - `const_cast` — Unchecked, zero cost → can cast away const but not used
 - `int` will cast to `uint` when added together
 
-## lvalue vs rvalue
+## rvalue and lvalue
 
 - `lvalue` features persistent address in mem so can be pointed to
 - `rvalue` temporary lives in `CPU register` during evaluation and dies at the end of expression `;`
 - & test : & get the address outof `lvalue` while `rvalue` cannot
+- `T&` -> lvalue reference -> alias to variable
+- `const T&` -> const lvalue reference applicable for rvalue -> read-only alias
+- `T&&` -> rvalue reference -> binds to `temporairies`
 
-```cpp
-int x = 5;              // x is an lvalue — named, has address, persists
-                         // 5 is an rvalue — temporary, no lasting identity
-
-process(x);              // binds to int& (lvalue ref)
-process(5);              // binds to int&& (rvalue ref)
-process(std::move(x));   // std::move CASTS x to rvalue ref — does NOTHING at runtime
-```
-
-| Syntax | Name | Binds to |
-|---|---|---|
-| `T&` | lvalue reference | alias to variable |
-| `const T&` | const lvalue reference | read-only alias (accepts rvalue too) |
-| `T&&` | rvalue reference | binds to temporaries |
-
-## `std::move` — cast, not copy
-
-- `std::move(x)` is equivalent to `static_cast<T&&>(x)` — a cast, not an operation
-- The move constructor then *steals* heap pointers from the rvalue
-- After `std::move(x)`, `x` is still a valid object in a "moved-from" state (can be destroyed or reassigned, but content is unspecified)
-- `std::move(x)` produces a `T&&` (rvalue reference to x). It is literally `static_cast<T&&>(x)`. 
-
-## Trivial vs non-trivial types
-
-- **Trivial** — no constructor, no destructor, no virtual methods. Raw bytes. `memcpy` is safe.
-  - `int`, `double`, `float`, `char`, `int[N]`, `struct { double x, y; }`
-  - `int x = 5;` → 4 bytes on stack.
-  - `int* p = new int(5);` → 8-byte pointer on stack + 4-byte int on heap.
-  - The `new` version requires manual `delete` or a smart pointer to avoid leaking.
-- **Non-trivial (resource-managing)** — ctor allocates heap, dtor frees it. `memcpy` → double free.
-  - `std::string`, `std::vector<T>`, `std::unique_ptr<T>`
-  - `memcpy` blindly copies stack bytes (ptr, size, cap) → both src and dest point to same heap addr → both destructors call `free()` → double free
-- **Virtual types** — `memcpy` → wrong vptr → virtual calls jump to garbage.
-  - A class with `virtual` has a hidden `vptr` pointing to its vtable. `memcpy` copies raw bytes (including vptr) without invoking the constructor that correctly sets vptr for the destination's actual type.
-  - Ctor sequence for vtable: base ctor runs first and sets `vptr → Base::vtable`. Then derived ctor runs and overwrites `vptr → Derived::vtable`. This ensures virtual calls during base ctor dispatch to base methods (not yet-constructed derived), and after full construction, vptr points to the final derived vtable.
-
-```cpp
-#include <type_traits>
-static_assert(std::is_trivially_copyable_v<double>);        // ✓
-static_assert(std::is_trivially_copyable_v<int[4]>);        // ✓
-static_assert(!std::is_trivially_copyable_v<std::string>);  // ✓ not trivial
-```
-
-## Keyword reference
-
-| Keyword | Affects | Purpose |
-|---|---|---|
-| `const` (on variable) | compiler | prevents modification, enables placing in `.rodata` |
-| `const` (after method) | compiler | method can be called on `const&` objects; use `mutable` for exceptions |
-| `volatile` | compiler | prevents read/write elimination — every access emits a real load/store |
-| `inline` | linker symbol | changes symbol from strong (`T`) to weak (`W`) — allows multiple definitions |
-| `constexpr` | compiler | enables compile-time evaluation; implies `inline` |
-| `static` (in function) | compiler/linker | variable persists across calls; stored in `.bss`/`.data`, not stack |
-| `static` (at file scope) | linker | internal linkage — symbol visible only in this TU (`t` in nm) |
-| `static` (class member) | linker | one instance shared across all objects; not tied to `this` |
-| `mutable` | compiler | allows modification of this field even in `const` methods (e.g., caches, mutexes) |
-| `atomic` | compiler/hw | thread-safe read/write + memory ordering; single CPU instruction `dmb ish` vs complex `std::mutex` |
-| global variable | linker | external linkage by default — visible across all TUs; stored in `.data`/`.bss`; use `extern` to declare without defining |
-| `#define` MACRO | preprocessor | textual substitution in `.ii` — no symbol, no type safety |
-
-- `atomic` is lock_free while mutex is not; `dmb ish` drains all pending writes before continue
-- `atomic<BigStruct>` falls back to mutex for speed
 
 ## function pointer
 
@@ -88,35 +31,16 @@ __END_DECLS
 ```
 - void(*)(int) is a `function pointer`
 
-## Pointer vs reference vs value
-
-```cpp
-int x = 5;           // value on STACK — owns data directly
-int* p = &x;         // pointer on STACK — holds address of x (8 bytes on 64-bit)
-int& r = x;          // reference — alias, not a separate object, no extra memory
-
-int* h = new int(10); // pointer on STACK (8 bytes) → data on HEAP (4 bytes)
-```
-
-**Key distinction**: `sizeof(std::vector<int>)` gives the stack footprint (~24 bytes: ptr+size+cap), NOT the heap data size. Use `.size()` for the logical element count.
-
----
-
 # Polymorphism
 
 `class Stm32Gpio : public IGpio {`
 - public : `IGpio& ref = stm32_obj;` → private does not allow this
 
-## struct, class, and namespace
-
-- struct is public by default; class is private by default
-- struct defaults to public inheritance; class defaults to private inheritance
-- Convention: `struct` for passive data (all public fields, no invariants)
-- Convention: `class` when there are invariants, private state, or methods that enforce rules
+## class, struct and namespace
 
 ### namespace vs struct
 
-- `namespace` can be extended anywhere
+- `namespace` can be extended anywhere so,
 - `namespace` cannot have `template` parameters, unlike the locally closed struct
 
 ```cpp
@@ -136,47 +60,17 @@ constexpr uint32_t GPIOA_ODR = 0x40020014;
 Reg<GPIOA_ODR>::set_bits(1 << 5);  // set pin 5 high
 ```
 
-## Virtual, vtable, and override
+## virtual and override
 
 - `virtual` prefixed base method should be overridden by derived method
-- `virtual` uint64_t micros() = 0; → `=0` means pure virtual where base cannot provide implementation
+- `virtual` uint64_t micros() = 0; -> `=0` means pure virtual where base cannot provide implementation
 - `override`-suffixed derived method lets compiler safety check against wrong paras
-- Correct ctor sequence: `new Derived` → allocate heap → run base ctor (sets vptr to Base's vtable) → run derived ctor (overwrites vptr to Derived's vtable). Final vptr points to Derived's vtable.
-- With `new`: object on heap, accessed via base pointer, virtual dispatch (indirect call via vtable). Without `new`: `Stm32Gpio gpio(reg, 5);` lives on stack, compiler knows the exact type, can devirtualize → direct call, no vtable overhead.
+- compiler stores virtual parent fns in `vtable`
+- Cost
+    - derived fns points to the base fns in vtable
+    - indirect call when `virtual` function call
 
-### vtable layout and dispatch cost
-
-```cpp
-IGpio* gpio = new Stm32Gpio(reg, 5);
-gpio->set(true);   // which set() gets called?
-
-// .rodata (compiled into binary, lives forever):
-// ┌─────────────────────────────────────────────┐
-// │  vtable for Stm32Gpio:                       │
-// │    [0] → Stm32Gpio::~Stm32Gpio()  (.text)   │
-// │    [1] → Stm32Gpio::set()         (.text)   │
-// │    [2] → Stm32Gpio::read()        (.text)   │
-// └─────────────────────────────────────────────┘
-
-// Heap:
-// ┌─────────────────────────┐
-// │  vptr ──→ vtable above  │  8 bytes (hidden first field)
-// │  reg_ = 0x40020014      │  8 bytes
-// │  pin_ = 5               │  1 byte + 7 padding
-// └─────────────────────────┘
-```
-
-gpio->set(true) compiles to:
-  1. Load vptr from object     (memory read)
-  2. Load vtable[1]            (memory read — get Stm32Gpio::set address)
-  3. Call that address          (indirect branch)
-
-vs. non-virtual call:
-  1. Call Stm32Gpio::set()     (direct branch — address known at compile time)
-
-Cost: 2 extra memory reads + indirect branch ≈ ~5ns overhead
-
-## dependency injection → polymorphism at consumer
+## dependency injection -> polymorphism at consumer
 
 ```cpp
 constexpr uint32_t GPIOA_ODR = 0x40020014;
@@ -190,8 +84,8 @@ void blink(Gpio& led) {led.set(true); }
 
 ## duck-typing compile time polymorphism
 
-- no vtable → can be constexpr & no base class
-- but keeps one fn copy per type and no mixed typed arr
+- no vtable -> can be constexpr & no base class
+- but keep one fns copy per type and no mixed typed arr
 
 ```cpp
 template<typename Gpio>
@@ -223,8 +117,6 @@ public:
     // toggle() inherited from GpioBase — calls Stm32Gpio::set/read directly
 };
 ```
-
----
 
 # Stack, Heap, and Object Lifecycle
 
@@ -287,13 +179,46 @@ The allocator (`libmalloc`) maintains a **free-list** — a `linked list` stored
 - `malloc(20)`: walk free-list → find block ≥ 20B → split → return pointer
 - `free(ptr)`: mark block unused → write `next` pointer into it → re-link list
 
-### When do we need data on heap
+### Constructor and destructor
 
-Stack is preferred but:
+This is why smart containers (string, vector, unique_ptr) **cannot be memcpy'd** —
+`memcpy` blindly copies stack bytes (ptr, size, cap) -> so both src and dest points to the same heap addr
+→ both destructors call `free()` on it → double free.
+
+### Trivial vs non-trivial types
+
+- **Trivial** — no constructor, no destructor, no virtual methods. Raw bytes. `memcpy` is safe.
+  - `int`, `double`, `float`, `char`, `int[N]`, `struct { double x, y; }`
+  - `int x = 5;` → 4 bytes on stack.
+  - `int* p = new int(5);` → 8-byte pointer on stack + 4-byte int on heap.
+  - The `new` version requires manual `delete` or a smart pointer to avoid leaking.
+- **Non-trivial (resource-managing)** — ctor allocates heap, dtor frees it. `memcpy` → double free.
+  - `std::string`, `std::vector<T>`, `std::unique_ptr<T>`
+- **Runtime Polymorphism by `virtual`** 
+  - vtable in heap obj stores the base-to-derived relationship
+  - base / derived both use vptr to point to their virtual table
+  - `memcpy` → wrong vptr → virtual calls jump to garbage.
+  - A class/struct with `virtual` has a hidden `vptr` field pointing to its vtable. `memcpy` copies the raw bytes (including vptr) without invoking the constructor that correctly sets the vptr for the destination's actual type. If the destination is a base type or a different derived type, the copied vptr points to the wrong vtable → virtual calls dispatch to garbage.
+  - [Q] Describe how ctor correctly contruct vtable for polymorphism
+
+```cpp
+// static_assert is a compile time check
+#include <type_traits>
+static_assert(std::is_trivially_copyable_v<double>);        // ✓
+static_assert(std::is_trivially_copyable_v<int[4]>);        // ✓
+static_assert(!std::is_trivially_copyable_v<std::string>);  // ✓ not trivial
+```
+
+### When do we need a data to be on heap
+
+Stack is preferred but
 
 1. **Lifetime must outlive the scope** — returning a large object from a factory, storing in a container that persists after the creating function returns.
+
 2. **Size unknown at compile time** — `new int[n]` where `n` is runtime. Stack requires compile-time size (VLAs are non-standard).
+
 3. **Too large for stack** — stack is typically 1–8 MB. A 10 MB array must go on heap.
+
 4. **Polymorphism via base pointer** — `ISensor* s = new AdcSensor();` — the concrete type is decided at runtime. Stack allocation requires knowing the exact type.
 
 ---
@@ -369,21 +294,9 @@ High address
 Low address
 ```
 
-### Rules of thumb
-
-- Local variable → stack (automatic, fast, no leak possible)
-- `global` / `static` → .data or .bss (lives forever)
-    - `global` has external linkage (visible in all TUs via `extern`); `static` at file scope has internal linkage (visible only in this TU). Both live in `.data`/`.bss` for the program's lifetime.
-- `static` fns
-- `new` / `malloc` → heap (manual or smart-pointer managed)
-- String literals (`"hello"`) → .rodata (compiled in, read-only)
-- vtables → .rodata (one per class, compiled in)
-- Code → .text (compiled in, read-only, executable)
-- If a type has a destructor → don't `memcpy`, use copy/move constructors
-
 ---
 
-## Copy vs move
+## Copy vs move — by type
 
 ### Trivial types — memcpy is the entire operation
 
@@ -398,6 +311,10 @@ Stack:                   Stack:
 │ a=5 │   ──copy 4B──►  │ a=5 │  │ b=5 │   independent copies
 └─────┘                 └─────┘  └─────┘
 ```
+
+- `std::move` only casts to rvalue ref so the move constructor can *steal* heap pointers.
+- [Q] is std::move == T&&?
+
 
 ### Non-trivial types — constructor must run, NOT memcpy
 
@@ -430,7 +347,8 @@ Stack              Heap
 
 - Copy constructor: allocate new heap block, memcpy the CONTENTS
 - Cost: malloc() + memcpy(N elements)
-- `malloc` returns a *new, distinct* heap address from the free-list. Now `a.ptr` and `b.ptr` point to different blocks — no double free.
+- w/o malloc() allocating new heap block -> heap double free 
+- `malloc` returns a *new, distinct* heap address from the free-list. Now `a.ptr` and `b.ptr` point to different blocks, so each destructor frees its own block independently — no double free.
 
 #### Move: `vector<int> b = std::move(a);`
 
@@ -444,24 +362,121 @@ Stack              Heap
 │ b.ptr ───┼───────────┘
 │ b.size=3 │
 └──────────┘
-```
 
+```
 - Move constructor: steal pointer, null source
 - Cost: 3 pointer/int assignments (24 bytes)
 - a is still alive and valid — just empty
 
 ---
 
-# C++ Build Pipeline
+## Virtual method calls — vtable layout
 
+- Correct: `new Derived` → allocate heap → run base ctor (sets vptr to Base's vtable) → run derived ctor (overwrites vptr to Derived's vtable). Final vptr points to Derived's vtable.
+- [Q] Compare IGpio* gpio = new Stm32Gpio(reg, 5); and w/o `new`
+
+```cpp
+IGpio* gpio = new Stm32Gpio(reg, 5);
+gpio->set(true);   // which set() gets called?
+
+// .rodata (compiled into binary, lives forever):
+// ┌─────────────────────────────────────────────┐
+// │  vtable for Stm32Gpio:                       │
+// │    [0] → Stm32Gpio::~Stm32Gpio()  (.text)   │
+// │    [1] → Stm32Gpio::set()         (.text)   │
+// │    [2] → Stm32Gpio::read()        (.text)   │
+// └─────────────────────────────────────────────┘
+
+// Heap:
+// ┌─────────────────────────┐
+// │  vptr ──→ vtable above  │  8 bytes (hidden first field)
+// │  reg_ = 0x40020014      │  8 bytes
+// │  pin_ = 5               │  1 byte + 7 padding
+// └─────────────────────────┘
 ```
+
+gpio->set(true) compiles to:
+  1. Load vptr from object     (memory read)
+  2. Load vtable[1]            (memory read — get Stm32Gpio::set address)
+  3. Call that address          (indirect branch)
+
+vs. non-virtual call:
+  1. Call Stm32Gpio::set()     (direct branch — address known at compile time)
+
+Cost: 2 extra memory reads + indirect branch ≈ ~5ns overhead
+
+---
+
+### Rules of thumb
+
+- Local variable → stack (automatic, fast, no leak possible)
+- `global` / `static` → .data or .bss (lives forever)
+    - [Q] Compare `global` and `static`
+- `static` fns 
+- `new` / `malloc` → heap (manual or smart-pointer managed)
+- String literals (`"hello"`) → .rodata (compiled in, read-only)
+- vtables → .rodata (one per class, compiled in)
+- Code → .text (compiled in, read-only, executable)
+- If a type has a destructor → don't `memcpy`, as it's stack, use copy/move constructors
+
+---
+
+## Operations quick-reference
+
+### Pointer vs reference vs value
+
+```cpp
+int x = 5;           // value on STACK — owns data directly
+int* p = &x;         // pointer on STACK — holds address of x (8 bytes on 64-bit)
+int& r = x;          // reference — alias, not a separate object, no extra memory
+
+int* h = new int(10); // pointer on STACK (8 bytes) → data on HEAP (4 bytes)
+```
+
+**Key distinction**: `sizeof(std::vector<int>)` gives the stack footprint (~24 bytes: ptr+size+cap), NOT the heap data size. Use `.size()` for the logical element count.
+
+### lvalue vs rvalue
+
+```cpp
+int x = 5;              // x is an lvalue — named, has address, persists
+                         // 5 is an rvalue — temporary, no lasting identity
+
+process(x);              // binds to int& (lvalue ref)
+process(5);              // binds to int&& (rvalue ref)
+process(std::move(x));   // std::move CASTS x to rvalue ref — does NOTHING at runtime
+```
+
+### `std::move` — what it does and doesn't do
+
+- std::move(x) is equivalent to: static_cast<T&&>(x)
+- casts to rvalue reference
+- After `std::move(x)`, `x` is still a valid object in a "moved-from" state (can be destroyed or reassigned, but content is unspecified)
+
+### `const`, `volatile`, `inline` — compiler/linker effects
+
+| Keyword | Affects | Purpose |
+|---|---|---|
+| `const` (on variable) | compiler | prevents modification, enables placing in `.rodata` |
+| `const` (after method) | compiler | method can be called on `const&` objects; use `mutable` for exceptions |
+| `volatile` | compiler | prevents read/write elimination — every access emits a real load/store |
+| `inline` | linker symbol | changes symbol from strong (`T`) to weak (`W`) — allows multiple definitions |
+| `constexpr` | compiler | enables compile-time evaluation; implies `inline` |
+| `static` (in function) | compiler/linker | variable persists across calls; stored in `.bss`/`.data`, not stack |
+| `static` (at file scope) | linker | internal linkage — symbol visible only in this TU (`t` in nm) |
+| `static` (class member) | linker | one instance shared across all objects; not tied to `this` |
+| `mutable` | compiler | allows modification of this field even in `const` methods (e.g., caches, mutexes) |
+[Q] Add `global`
+| `#define` MACRO | preprocessor | textual substitution in `.ii` — no symbol, no type safety |
+
+
+# C++ build pipeline
+
 Source Code          Stage 1          Stage 2          Stage 3          Stage 4
    .cpp      ──────► .i/ii   ──────► .s       ──────► .o       ──────► executable
               PREPROCESS       COMPILE          ASSEMBLE          LINK
 
   main.cpp    main.ii          main.s           main.o           cvd_controller
   (text)      (expanded text)  (assembly text)  (machine code)   (runnable binary)
-```
 
 Stage 1: PREPROCESS — cpp (or g++ -E)
 - #include parts of .cpp are expanded by including .h into .ii
@@ -478,12 +493,13 @@ Stage 3: ASSEMBLE — g++ -c (or 'as')
 Stage 4: LINK — g++ (calls ld internally)
 - The dynamic loader path is stored in the ELF `PT_INTERP` segment (e.g., `/lib64/ld-linux-x86-64.so.2` on Linux, `/usr/lib/dyld` on macOS). The kernel reads this at exec time to determine which loader runs.
 - g++ main.o -o main
-- file main → check the dynamic loader
+- file main -> check the dynamic loader
 
-All at once:
+All at once
 - g++ -std=c++17 -I src/common src/controller/main.cpp -o main
 
-## Compilation details
+
+## 2. Compilation details
 
 - Lexing & Parser
     - Tokenize source → build Abstract Syntax Tree (AST)
@@ -506,10 +522,10 @@ All at once:
 - Stack frame layout
     - Decide where each local variable lives relative to Register Stack Pointer
 
-### inline, constexpr, and inlining
+### inline and constexpr and Inlining compiler decision
 
 - `inline`, `constexpr`, `template` all produce weak symbols → all ODR-safe in headers
-    - each .o carries a copy → linker keeps one → discards duplicates
+    - each .o carries a copy -> linker keeps one -> discards duplicates
     - any definition placed in .h MUST be one of these, otherwise ODR violation
 - `constexpr` → implies `inline` (weak symbol) + CAN evaluate at compile time
     - `constexpr int x = factorial(5);` → computed by compiler, no runtime call
@@ -517,13 +533,26 @@ All at once:
 - Inlining (body expanded at call site, no `bl`) is a compiler optimization
     - `-O2` inlines small fns automatically regardless of `inline` keyword
     - too much inlining bloats code → cache misses → slower
-    - `-O2` also folds obvious compile-time constants
-    - `volatile` prevents reordering or cutting of loads/stores of a var
+    - `-O2` also folds obvious compile-time constants -> obvious calculation
+    - `volatile` prevents reoredering or cutting or loads / stores of a var
 
-## Link (ld)
+### const mutable volatile atomic
+
+- `const` fns do not change the obj
+- `mutable` var of an obj can change under `const` fns
+- `volatile` Inform compiler this variable can change outside your view
+- std::atomic<T> adds thread-safe read/write + memory ordering to `volatile`
+- atomic is a single CPU instruction `dmb  ish` over the complex std::mutex
+    - atomic is lock_free while mutex is not
+    - dmb  ish  drains all pending write before continue
+- atomic<BigStruct> falls back to mutex for speed
+
+## 3. Assemble as
+
+## 4. Link ld
 
 - Linker resolves compile-yielded symbols by name — it does not re-check types.
-1. Link time
+1. Linker time
     - Linker marks executable as dynamically linked.
     - writes metadata to executable
         - PT_INTERP (loader path, e.g. ld-linux-x86-64.so.2)
@@ -531,16 +560,15 @@ All at once:
 2. Runtime (after build, when you run executable)
     - Kernel reads PT_INTERP and starts the dynamic loader.
     - Loader resolves shared libraries and verifies arch / version
-- ODR violation occurs when two .o files are compiled against different versions of the same header — the linker silently picks one definition, and the other .o interprets memory with wrong layout → undefined behavior.
+- [Q] ODR violation occurs when two .o files running together are compiled against different versions of the same header.
 
-### .o / .so / .dylib / .dll comparison
-
-- `.o` — relocatable object file (one TU's machine code, unresolved symbols, build-time only)
-- `.so` — Linux shared library (linked, PIC, runtime-loadable via `dlopen`)
-- `.dylib` — macOS shared library (equivalent to `.so`)
-- `.dll` — Windows shared library (equivalent to `.so`)
-- `ctypes.CDLL` — Python's FFI wrapper that calls `dlopen`/`LoadLibrary` to load a `.so`/`.dylib`/`.dll`
-- `ldd` — Linux CLI tool that prints shared library dependencies of an executable (macOS equivalent: `otool -L`)
+- .o / .so / .dylib / .dll comparison:
+  - `.o` — relocatable object file (one TU's machine code, unresolved symbols, build-time only)
+  - `.so` — Linux shared library (linked, PIC, runtime-loadable via `dlopen`)
+  - `.dylib` — macOS shared library (equivalent to `.so`)
+  - `.dll` — Windows shared library (equivalent to `.so`)
+  - `ctypes.CDLL` — Python's FFI wrapper that calls `dlopen`/`LoadLibrary` to load a `.so`/`.dylib`/`.dll`
+  - `ldd` — Linux CLI tool that prints shared library dependencies of an executable (macOS equivalent: `otool -L`)
 
 ```
 +----------------------+-------------------------------+-----------------------------------------------+
@@ -553,16 +581,14 @@ All at once:
 | Primary use          | linker (ld) at build time     | OS loader at runtime                          |
 +----------------------+-------------------------------+-----------------------------------------------+
 ```
-
-.so properties:
+.so properties
 - extern "C" for Python/C interop (no mangling)
 - g++ -std=c++17 -shared -fPIC pid_lib.cpp -o libpid.dylib
 
-### Mangling and symbols
+### Mangling and symbol
 
 - One executable, one symbol
-- Mangling distinguishes overloaded function names in C++
-```
+- Mangling distinguish the over loaded function name in C++
    _ZN3PID7computeEddd
     ││ │   │      ││││
     ││ │   │      │└─── d = double (paras)
@@ -571,8 +597,7 @@ All at once:
     ││ └──────────────── 3PID = class name
     │└────────────────── N = nested name start
     └─────────────────── _Z = C++ mangled
-```
-- `extern "C" void handle_signal(int sig);` disables mangling so the symbol is `handle_signal` only
+- `extern "C" void handle_signal(int sig);` disable mangling so the symbol is `handle_signal` only
 - `nm main.o`
     - `T` global function / `t` static (internal linkage) function
     - `b` static local data
@@ -581,32 +606,9 @@ All at once:
     - `W` weak symbols — inline, constexpr, template
 - weak symbols
     - inline functions are intrinsically weak
-    - compiler randomly keeps one of multiple conflicting weak symbols
+    - compiler randomly keep one of the multiple conflicting weak symbols
 
-## Header files & ODR
-
-- `<T>` must be in .h because compiler needs the body to instantiate per type
-    - escape hatch: explicit instantiation in one .cc keeps template body out of header
-- any non-template definition in .h must be marked `inline` to be ODR-safe
-    - class member functions defined inside class body are implicitly `inline`
-- `#ifndef FOO_H_` / `#define FOO_H_` / `#endif` guard prevents multiple inclusion
-    - With include guards, the first `#include` seen by the preprocessor wins; subsequent includes of the same header are skipped (guarded out).
-- one .h for all .cpp can avoid ODR (One Definition Rule)
-    - Bazel / CMake guarantees single header version so ODR is avoided
-    - If two .cpp files include different versions of the same header (e.g., struct layout changed), each .o is compiled with a different definition of the same symbol. The linker silently picks one — the other .o now interprets memory with the wrong layout → undefined behavior (silent corruption, not a linker error).
-
-### __restrict
-
-- these pointers do not reference one another during function call
-- do not bl hence compiler friendly
-
-```cpp
-int getaddrinfo(const char * __restrict, const char * __restrict,
-                const struct addrinfo * __restrict,
-                struct addrinfo ** __restrict);
-```
-
-## g++ invocation
+## g++ invoke binaries
 
 ```sh
 g++ -v -std=c++17 -I src/common src/controller/main.cpp -o main 2>&1
@@ -616,19 +618,59 @@ Thread model: posix
 InstalledDir: /Library/Developer/CommandLineTools/usr/bin
 ```
 
-## -std=c++17 & POSIX & libc
+## -std=c++17 & POSIX & lib c
 
 - std flag specifies which path stds should be found
 - POSIX libs are OS specific and can be checked by `g++ -###`
+- std:: (C++)
+    - Defined by ISO C++ committee
+    - Name mangling: yes (`_ZSt5clamp...`)
+    - Namespace: `std::`
+    - Templates/overloads: yes
+    - Talks to kernel: rarely
+    - Portable to Windows: yes (MSVC)
+- libc (C)
+    - Defined by ISO C committee
+    - Name mangling: no (`memcpy`)
+    - Namespace: `std::` or global
+    - Templates/overloads: no
+    - Talks to kernel: sometimes (`malloc`)
+    - Portable to Windows: yes (MSVC)
+- POSIX
+    - Defined by IEEE / Open Group
+    - Name mangling: no (`signal`)
+    - Namespace: global only
+    - Templates/overloads: no to support both C and C++
+    - Talks to kernel: almost always
+    - Portable to Windows: no
 
-| | std:: (C++) | libc (C) | POSIX |
-|---|---|---|---|
-| Defined by | ISO C++ committee | ISO C committee | IEEE / Open Group |
-| Name mangling | yes (`_ZSt5clamp...`) | no (`memcpy`) | no (`signal`) |
-| Namespace | `std::` | `std::` or global | global only |
-| Templates/overloads | yes | no | no (supports both C/C++) |
-| Talks to kernel | rarely | sometimes (`malloc`) | almost always |
-| Portable to Windows | yes (MSVC) | yes (MSVC) | no |
+## struct and class
+
+- struct is public by default and class is private
+- struct default to public inheritence while class default to the private inheritence
+- Convention: `struct` for passive data (all public fields, no invariants)
+- Convention: `class` when there are invariants, private state, or methods that enforce rules
+
+## Header file
+
+- `<T>` must be in .h because compiler needs the body to instantiate per type
+    - escape hatch: explicit instantiation in one .cc keeps template body out of header
+- any non-template definition in .h must be marked `inline` to be ODR-safe
+    - class member functions defined inside class body are implicitly `inline`
+- `#ifndef FOO_H_` / `#define FOO_H_` / `#endif` guard prevents multiple inclusion
+    - With include guards, the first `#include` seen by the preprocessor wins; subsequent includes of the same header are skipped (guarded out). There is no conflict — the guard simply prevents re-expansion in a single TU.
+- one .h for all .cpp can avoid ODR (One Definition Rule)
+    - Bazel / CMake guarantees single header version so ODR is avoided
+    - If two .cpp files include different versions of the same header (e.g., struct layout changed), each .o is compiled with a different definition of the same symbol. The linker silently picks one — the other .o now interprets memory with the wrong layout → undefined behavior (silent corruption, not a linker error).
+
+### __restrict 
+
+- these pointers do not reference one another during function call
+- donot bl hence compiler friendly
+
+int		getaddrinfo(const char * __restrict, const char * __restrict,
+			    const struct addrinfo * __restrict,
+			    struct addrinfo ** __restrict);
 
 ---
 
@@ -781,7 +823,7 @@ void set_temp(Celsius target);       // can't pass raw double
 
 ## 8. Double buffering — DMA ping-pong
 
-- DMA with double buffering completes the data read for CPU → saves polling
+- DMA with double buffering completes the data read for CPU -> saves polling
 
 ```cpp
 alignas(32) uint16_t adc_buf[2][256];  // two buffers
@@ -845,6 +887,8 @@ Led::set(5);
 ```
 
 ```
+
+
                     ┌─────────────────────┐
                     │  ISR ↔ Main Loop    │  ← the core constraint
                     └────────┬────────────┘

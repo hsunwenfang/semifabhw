@@ -1,76 +1,12 @@
 # Embedded System Design Patterns
 
-#### No-OS internal (single MCU bugs)
-
-| # | Problem | Root cause | Debug method |
-|---|---|---|---|
-| 1 | **Stack overflow** | Deep call chain / large local arrays | Canary pattern, check SP |
-| 2 | **ISR ↔ main data tear** | Non-atomic read of multi-byte struct | Critical section or double-buffer |
-| 3 | **Missed interrupts** | Critical section too long | Timer measure IRQ-disabled duration |
-| 4 | **Timing jitter** | Super-loop iteration time varies | Hardware timer trigger, not software delay |
-| 5 | **Watchdog reset loop** | One code path forgets to kick | Store state in backup register before reset |
-| 6 | **Heisenbug** | Debug printf changes timing | GPIO toggle + scope (zero overhead) |
-
-#### No-OS ↔ No-OS (sensor-to-sensor, rare)
-
-| # | Problem | Root cause | Debug method |
-|---|---|---|---|
-| 7 | **CAN bus contention** | Two MCUs transmit simultaneously, lower-priority always loses | Check CAN priority assignment, add jitter |
-| 8 | **Daisy-chain SPI desync** | One MCU resets, shifts all downstream data by N bits | Frame delimiter + CRC per device |
-| 9 | **Shared sensor conflict** | Two MCUs try to read same I2C sensor | Bus arbitration failure → assign master |
-
-#### RTOS ↔ No-OS (controller to sensor MCU)
-
-| # | Problem | Root cause | Debug method |
-|---|---|---|---|
-| 10 | **Command/response mismatch** | RTOS sends next cmd before MCU finished previous | Sequence number protocol, wait-for-ACK |
-| 11 | **I2C/SPI bus lockup** | MCU reset mid-transaction, slave holds bus | 9-clock recovery, bus timeout watchdog |
-| 12 | **Sensor data stale** | MCU hung or crashed, RTOS reads old buffer | Timestamp in every packet, reject if too old |
-| 13 | **Baud rate mismatch after update** | MCU firmware updated, RTOS not updated | Version handshake at boot |
-| 14 | **DMA overrun** | RTOS polls too slow, MCU's DMA wraps around buffer | Flow control: MCU signals "buffer full" |
-
-#### RTOS internal (single controller bugs)
-
-| # | Problem | Root cause | Debug method |
-|---|---|---|---|
-| 15 | **Priority inversion** | Low-prio task holds mutex needed by high-prio | Priority inheritance, Tracealyzer |
-| 16 | **Deadlock** | Task A waits on B's mutex, B waits on A's | Lock ordering convention, timeout on all mutexes |
-| 17 | **Task starvation** | One task never yields, lower-prio tasks starve | Preemptive scheduler + time-slice for same-priority |
-| 18 | **Memory leak (heap)** | Dynamic alloc in task without matching free | Pool allocator instead of malloc, track high-water |
-| 19 | **Race in shared state** | Two tasks modify recipe state without lock | Mutex or message-passing (share nothing) |
-
-#### RTOS ↔ RTOS (peer controller coordination)
-
-| # | Problem | Root cause | Debug method |
-|---|---|---|---|
-| 20 | **Lost handoff message** | UDP dropped, no retry | Sequence + ACK + timeout + retry |
-| 21 | **Split-brain** | Network partition, both think they're master | Heartbeat timeout → safe-state, single arbitrator |
-| 22 | **Ordering violation** | Chamber B starts before transfer confirms placement | State machine enforces preconditions |
-| 23 | **Clock drift** | Two boards disagree on timestamps → wrong sequence | PTP (IEEE 1588) or NTP sync, or use sequence numbers not time |
-| 24 | **Reflective memory stale** | Writer crashes, reader sees old valid data | Generation counter + watchdog bit in shared mem |
-
-#### Full-OS ↔ RTOS (equipment host to chamber)
-
-| # | Problem | Root cause | Debug method |
-|---|---|---|---|
-| 25 | **Recipe step timeout** | RTOS stuck in fault state, host keeps waiting | Host-side watchdog per step with configurable timeout |
-| 26 | **Parameter mismatch** | Host sends float, RTOS expects fixed-point | Interface definition (IDL), version in message header |
-| 27 | **Network buffer overflow** | Host floods RTOS with commands faster than processed | Flow control: RTOS ACKs each command before next |
-| 28 | **Log correlation** | Bug spans host + RTOS, timestamps don't match | Synchronized time (PTP), unified trace ID |
-
-#### Full-OS ↔ Factory (SECS/GEM)
-
-| # | Problem | Root cause | Debug method |
-|---|---|---|---|
-| 29 | **HSMS connection drop** | Network switch failover, tool goes offline | Auto-reconnect with state recovery |
-| 30 | **Recipe download corrupt** | Large recipe > single message, assembly error | Chunked transfer + CRC + verify-after-write |
-
 ## Hardware Abstraction Patterns
 
 > CPU registers, memory-mapped I/O, bus architecture → [embeded-system-hw.md § 1](embeded-system-hw.md#1-compute--cpu--registers)
 
 ### 1. Hardware Abstraction Layer (HAL) with polymorphism
 
+[Q] Is this how vtable is used at runtime
 ```armasm
 ldr  r0, [obj]         // load vptr from object (memory read #1)
 ldr  r1, [r0, #4]     // load function address from vtable (memory read #2)
@@ -97,9 +33,10 @@ public:
 
 ### 2. Register Access Pattern
 
-Wrap memory-mapped I/O registers in typed structs with `volatile` pointer access.
-Use `static_assert` on struct sizes to guarantee layout matches hardware documentation. 
-`Reg<Addr>` template finishes at compile time
+- memory-mapped I/O registers struct
+- `volatile` pointer access.
+- Use `static_assert` on struct sizes to ensure HW layout
+- `Reg<Addr>` template finishes at compile time
 
 ```cpp
 template<uint32_t Addr>
@@ -108,6 +45,7 @@ struct Reg {
         return *reinterpret_cast<volatile uint32_t*>(Addr);
     }
     static void set_bits(uint32_t mask) { ref() |= mask; }
+    [Q] why does this clear bit
     static void clear_bits(uint32_t mask) { ref() &= ~mask; }
 };
 
@@ -118,28 +56,13 @@ Reg<GPIOA_ODR>::set_bits(1 << 5);  // set pin 5 high
 static_assert(sizeof(GpioRegs) == 24, "GPIO register block size mismatch");
 ```
 
-### 3. Board Support Package (BSP)
-
-link only the wanted `bsp.h`/`bsp.cpp` pair per target board.
-
-```bash
-# For real hardware
-target_sources(app PRIVATE bsp_nucleo.cpp)
-# For Mac simulator
-target_sources(app PRIVATE bsp_sim.cpp)
-```
-
 ---
 
 ## Concurrency / Scheduling Patterns
 
-> Interrupt hardware mechanics (NVIC, vector table, context save) → [embeded-system-hw.md § 2](embeded-system-hw.md#2-interrupt-hardware-nvic)
-
 ### 4. Super Loop
 
-simple loop works well when all tasks fit within the cycle budget.
-Add a cycle-time watchdog to detect overruns.
-Your CVD controller uses this pattern — `recv()`, state machine, `send()` in a loop.
+simple loop monitored only by kicking the `watchdog` at the end
 
 ```cpp
 int main() {
@@ -160,10 +83,9 @@ int main() {
 ### 5. Interrupt / ISR Pattern
 ### 6. Interrupt → Deferred Work
 
-- Register a short function that hw invokes when an event occurs (pin change, timer tick, UART byte received).
-- ISR must execute quickly — Avoid allocations, I/O, or long computation inside ISRs. -> hardwork deferred to SW callback
+- Short react to Interruption like pin change, timer tick, UART byte received 
+- ISR must execute quickly — Avoid `allocations`, `I/O` -> hardwork deferred to SW callback
 - use `volatile sig_atomic_t running=1;`
-- On POSIX systems (macOS simulation), model interrupts using `signal()` or `timer_create()` with `SIGALRM`. 
 - `mishandling` ISR/main boundary causes race conditions and data corruption.
 
 ### 7. Cooperative Scheduler
@@ -206,25 +128,6 @@ Interrupt in preemption can casue race condition or unrecoverable corrupted
 
 the task with the shortest period gets the highest priority.
 CPU utilization and calculate `wcet_us`
-
-```cpp
-// RMS: shortest period = highest priority
-struct RmsTask {
-    void (*run)();
-    uint32_t period_us;
-    uint32_t wcet_us;      // worst-case execution time
-    uint32_t deadline_us;
-};
-
-// Verify schedulability: U = sum(wcet/period) < N*(2^(1/N) - 1)
-bool is_schedulable(RmsTask* tasks, int n) {
-    double u = 0;
-    for (int i = 0; i < n; i++)
-        u += (double)tasks[i].wcet_us / tasks[i].period_us;
-    double bound = n * (std::pow(2.0, 1.0/n) - 1.0);
-    return u <= bound;
-}
-```
 
 ---
 
@@ -293,7 +196,7 @@ void dispatch(Event e) {
 
 A base `IState` interface with `enter()`, `execute()`, `exit()` methods.
 This separates per-state logic into dedicated classes, each testable in isolation.
-Downside: heap allocation or a static pool is needed for state objects, and the indirection can be too heavy for small MCUs.
+Downside: `heap allocation` or a static pool is needed for state objects, and the indirection can be too heavy for small MCUs.
 
 ```cpp
 class IState {
@@ -320,16 +223,12 @@ public:
 
 ## Communication Patterns
 
-### 14. Observer / Publish-Subscribe
+### 14. Publisher / Publish-Subscribe
 
-A subject maintains a list of callback function pointers.
-When an event occurs, it iterates the list and invokes each callback with the event data.
-Subscribers register/unregister at runtime.
+- `Publisher` keeps a list of callbacks to reach `Subscribers ` subsribing at runtime when needed
+- `callback` must be short for unblocking Publisher
+- Use of `std::function`
 
-Use a fixed-size array of function pointers (no `std::vector` on MCU).
-This decouples the sensor module from lister types.
-Keep callbacks short to avoid blocking the publisher.
-In C++, use `std::function` on capable targets or raw function pointers on bare-metal.
 
 ```cpp
 template<typename T, int MaxSubs = 8>
@@ -354,7 +253,10 @@ void check_interlock(const float& t) { if (t > 500) fault(); }
 
 ### 15. Message Queue
 
-A thread-safe FIFO buffer between producer (ISR or task) and consumer (main loop or another task). Fixed-size, pre-allocated, no heap. The producer writes to head, consumer reads from tail. For ISR→main communication, use a lock-free single-producer single-consumer (SPSC) ring buffer with atomic indices. For multi-producer scenarios, disable interrupts briefly around the push or use compare-and-swap. Message queues decouple timing — the producer doesn't wait for the consumer, enabling asynchronous architectures.
+A thread-safe FIFO buffer between producer (ISR or task) and consumer (main loop or another task).
+Fixed-size, pre-allocated, no heap. The producer writes to head, consumer reads from tail. 
+For ISR→main communication, use a lock-free single-producer single-consumer (SPSC) ring buffer with atomic indices.
+For multi-producer scenarios, disable interrupts briefly around the push or use compare-and-swap. Message queues decouple timing — the producer doesn't wait for the consumer, enabling asynchronous architectures.
 
 ```cpp
 template<typename T, int N>
@@ -382,7 +284,7 @@ public:
 
 ### 16. Command Pattern
 
-Encapsulate each request (set temperature, open valve, start recipe) as a struct with an opcode and payload. Commands are queued, logged, and executed by a dispatcher. This enables undo/redo, command replay for diagnostics, and remote control — send the same command struct over UART or TCP. The executor switch-cases on the opcode and calls the appropriate handler. On larger systems, commands can be polymorphic objects. Fixed-size command structs ensure predictable memory usage.
+command polymorphism
 
 ```cpp
 enum class CmdType : uint8_t { SET_TEMP, SET_PRESSURE, START_RECIPE, STOP };
@@ -406,39 +308,11 @@ void execute(const Command& cmd) {
 }
 ```
 
-### 17. Protocol Handler
-
-Define a fixed binary struct for wire communication. Both endpoints share the same struct definition (or equivalent) to serialize/deserialize data. Include a header with magic bytes, sequence number, length, and CRC for framing and integrity. The handler implements a state machine: WAIT_HEADER → READ_PAYLOAD → VALIDATE_CRC → DISPATCH. Use `__attribute__((packed))` or `#pragma pack` to prevent compiler padding. Your `SimPacket` is a minimal version — adding framing and CRC makes it production-ready.
-
-```cpp
-#pragma pack(push, 1)
-struct Frame {
-    uint16_t magic;      // 0xABCD
-    uint8_t  msg_type;
-    uint16_t length;
-    uint8_t  payload[128];
-    uint32_t crc;
-};
-#pragma pack(pop)
-
-enum class ParseState { SYNC, HEADER, PAYLOAD, CRC };
-
-ParseState parse_byte(uint8_t byte) {
-    static Frame frame;
-    static int pos = 0;
-    // Feed bytes into frame, transition states
-    // On CRC valid → dispatch(frame)
-    // On CRC fail → discard, resync on magic
-}
-```
-
 ### 18. Double Buffer
 
-Maintain two buffers: one being written by the producer, one being read by the consumer.
-When the producer finishes a frame, swap the pointers atomically.
+Maintain two buffers : one being written by the producer, one being read by the consumer.
 The consumer always reads a complete, consistent frame — never a half-written one.
 Zero-copy, no mutex needed if the swap is atomic.
-Used for display framebuffers, sensor data frames, and network packet assembly.
 On MCUs, use a `volatile` pointer swap.
 On multi-core, use `std::atomic<T*>::exchange`.
 Costs 2× memory but eliminates all read/write contention.
@@ -1137,3 +1011,70 @@ reactor.add(hmi_socket, [&]{ handle_hmi_command(); });
 reactor.add(timer_fd,   [&]{ watchdog_kick(); });
 reactor.run();
 ```
+
+## Tech stack they fit
+
+#### No-OS internal (single MCU bugs)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 1 | **Stack overflow** | Deep call chain / large local arrays | Canary pattern, check SP |
+| 2 | **ISR ↔ main data tear** | Non-atomic read of multi-byte struct | Critical section or double-buffer |
+| 3 | **Missed interrupts** | Critical section too long | Timer measure IRQ-disabled duration |
+| 4 | **Timing jitter** | Super-loop iteration time varies | Hardware timer trigger, not software delay |
+| 5 | **Watchdog reset loop** | One code path forgets to kick | Store state in backup register before reset |
+| 6 | **Heisenbug** | Debug printf changes timing | GPIO toggle + scope (zero overhead) |
+
+#### No-OS ↔ No-OS (sensor-to-sensor, rare)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 7 | **CAN bus contention** | Two MCUs transmit simultaneously, lower-priority always loses | Check CAN priority assignment, add jitter |
+| 8 | **Daisy-chain SPI desync** | One MCU resets, shifts all downstream data by N bits | Frame delimiter + CRC per device |
+| 9 | **Shared sensor conflict** | Two MCUs try to read same I2C sensor | Bus arbitration failure → assign master |
+
+#### RTOS ↔ No-OS (controller to sensor MCU)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 10 | **Command/response mismatch** | RTOS sends next cmd before MCU finished previous | Sequence number protocol, wait-for-ACK |
+| 11 | **I2C/SPI bus lockup** | MCU reset mid-transaction, slave holds bus | 9-clock recovery, bus timeout watchdog |
+| 12 | **Sensor data stale** | MCU hung or crashed, RTOS reads old buffer | Timestamp in every packet, reject if too old |
+| 13 | **Baud rate mismatch after update** | MCU firmware updated, RTOS not updated | Version handshake at boot |
+| 14 | **DMA overrun** | RTOS polls too slow, MCU's DMA wraps around buffer | Flow control: MCU signals "buffer full" |
+
+#### RTOS internal (single controller bugs)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 15 | **Priority inversion** | Low-prio task holds mutex needed by high-prio | Priority inheritance, Tracealyzer |
+| 16 | **Deadlock** | Task A waits on B's mutex, B waits on A's | Lock ordering convention, timeout on all mutexes |
+| 17 | **Task starvation** | One task never yields, lower-prio tasks starve | Preemptive scheduler + time-slice for same-priority |
+| 18 | **Memory leak (heap)** | Dynamic alloc in task without matching free | Pool allocator instead of malloc, track high-water |
+| 19 | **Race in shared state** | Two tasks modify recipe state without lock | Mutex or message-passing (share nothing) |
+
+#### RTOS ↔ RTOS (peer controller coordination)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 20 | **Lost handoff message** | UDP dropped, no retry | Sequence + ACK + timeout + retry |
+| 21 | **Split-brain** | Network partition, both think they're master | Heartbeat timeout → safe-state, single arbitrator |
+| 22 | **Ordering violation** | Chamber B starts before transfer confirms placement | State machine enforces preconditions |
+| 23 | **Clock drift** | Two boards disagree on timestamps → wrong sequence | PTP (IEEE 1588) or NTP sync, or use sequence numbers not time |
+| 24 | **Reflective memory stale** | Writer crashes, reader sees old valid data | Generation counter + watchdog bit in shared mem |
+
+#### Full-OS ↔ RTOS (equipment host to chamber)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 25 | **Recipe step timeout** | RTOS stuck in fault state, host keeps waiting | Host-side watchdog per step with configurable timeout |
+| 26 | **Parameter mismatch** | Host sends float, RTOS expects fixed-point | Interface definition (IDL), version in message header |
+| 27 | **Network buffer overflow** | Host floods RTOS with commands faster than processed | Flow control: RTOS ACKs each command before next |
+| 28 | **Log correlation** | Bug spans host + RTOS, timestamps don't match | Synchronized time (PTP), unified trace ID |
+
+#### Full-OS ↔ Factory (SECS/GEM)
+
+| # | Problem | Root cause | Debug method |
+|---|---|---|---|
+| 29 | **HSMS connection drop** | Network switch failover, tool goes offline | Auto-reconnect with state recovery |
+| 30 | **Recipe download corrupt** | Large recipe > single message, assembly error | Chunked transfer + CRC + verify-after-write |

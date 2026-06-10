@@ -19,7 +19,6 @@ Reg<GPIOA_ODR>::set_pin(Pin{5});  // compiles
 
 ---
 
-## 2. Move-Only DMA Buffer
 
 **Concepts**: move semantics (T&&), deleted copy constructor, placement new
 
